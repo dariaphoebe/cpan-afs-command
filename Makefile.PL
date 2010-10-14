@@ -11,8 +11,11 @@ perl_version q{5.010};
 license      q{unknown};
 all_from     q{lib/AFS/Command.pm};
 
+test_requires q{Test::Exception};
+
 requires q{Moose};
 requires q{Date::Format};
+requires q{Try::Tiny};
 
 tests_recursive;
 
