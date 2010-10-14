@@ -86,8 +86,8 @@ sub _build_operations {
                 $command .= q{ offline -help};
             }
 
-            exec $command;
-            croak qq{Unable to exec $command: $ERRNO\n};
+            exec $command ||
+                croak qq{Unable to exec $command: $ERRNO\n};
 
         } else {
 
@@ -171,8 +171,8 @@ sub arguments {
             croak qq{Unable to redirect stderr: $ERRNO};
         STDOUT->fdopen( $pipe->writer->fileno, q{w} ) ||
             croak qq{Unable to redirect stdout: $ERRNO\n};
-        exec $command, $operation, '-help';
-        croak qq{Unable to exec $command help $operation: $ERRNO};
+        exec( $command, $operation, '-help' ) ||
+            croak qq{Unable to exec $command help $operation: $ERRNO};
 
     } else {
 
@@ -426,9 +426,8 @@ sub _exec_commands {
 
             $ENV{TZ} = q{GMT} if not $self->localtime;
 
-            exec { $command->[0] } @{ $command };
-
-            croak qq{Unable to exec @{$command}: $ERRNO};
+            exec( { $command->[0] } @{ $command } ) ||
+                croak qq{Unable to exec @{$command}: $ERRNO};
 
         }
 

@@ -125,7 +125,7 @@ ok( $header->status eq q{online}, q{header->status} );
 # Second, we check the VLDB entry for this volume.
 my $vldbentry = $result->getVLDBEntry;
 ok( ref $vldbentry && $vldbentry->isa( q{AFS::Object::VLDBEntry} ), q{result->getVLDBEntry} );
-ok( $vldbentry->rwrite =~ q{^\d+$}ms, q{vldbentry->rwrite is numeric} );
+ok( $vldbentry->rwrite =~ m{^\d+$}ms, q{vldbentry->rwrite is numeric} );
 
 # This should match the rwrite ID found in the volume headers, too.
 ok( $vldbentry->rwrite == $rwrite, q{vldbentry->rwrite matches header->rwrite} );
