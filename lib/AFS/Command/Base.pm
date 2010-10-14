@@ -503,14 +503,13 @@ sub _reap_commands {
 sub AUTOLOAD {
 
     my $self = shift;
-    my %args = @_;
 
     my $operation = $AUTOLOAD;
     $operation =~ s{.*::}{}ms;
 
     $self->operation( $operation );
 
-    $self->_parse_arguments(%args);
+    $self->_parse_arguments(@_);
     $self->_exec_commands( stderr => q{stdout} );
     $self->_parse_output;
     $self->_reap_commands;
