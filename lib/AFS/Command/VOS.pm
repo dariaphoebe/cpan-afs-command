@@ -4,6 +4,8 @@ use Moose;
 use English;
 use Carp;
 
+use feature q{switch};
+
 extends qw(AFS::Command::Base);
 
 use AFS::Object;
@@ -46,9 +48,11 @@ sub examine {
         # might very well have several of these chunks of data for RO
         # volumes.
         #
+        my $header = q{};
+
         if ( m{^\*{4}}ms ) {
 
-            my $header = AFS::Object::VolumeHeader->new;
+            $header = AFS::Object::VolumeHeader->new;
 
             if ( m{Volume (\d+) is busy}ms ) {
                 $header->_setAttribute(
@@ -70,7 +74,7 @@ sub examine {
 
         } elsif ( m{^(\S+)\s+(\d+)\s+(RW|RO|BK)\s+(\d+)\s+K}ms ) {
 
-            my $header = AFS::Object::VolumeHeader->new;
+            $header = AFS::Object::VolumeHeader->new;
 
             if ( m{^(\S+)\s+(\d+)\s+(RW|RO|BK)\s+(\d+)\s+K\s+([\w-]+)}ms ) {
 

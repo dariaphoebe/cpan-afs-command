@@ -104,7 +104,7 @@ sub examine {
             $data{$key} = $value;
         }
 
-        if not ( $data{id} ) {
+        if ( not $data{id} ) {
             croak qq{pts examine: Unrecognized output: '$_'};
         }
 

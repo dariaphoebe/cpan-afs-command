@@ -91,8 +91,7 @@ sub getlog {
     }
 
     if ( $redirect ) {
-        $redirect->close ||
-            croak qq{Unable to close $redirectname: $ERRNO}
+        $redirect->close || croak qq{Unable to close $redirectname: $ERRNO};
         $result->_setAttribute( log => $redirectname );
     } else {
         $result->_setAttribute( log => $log );
