@@ -57,7 +57,7 @@ foreach my $name ( $ptsgroup, $ptsuser ) {
     } catch {
         my @error = @_;
         # XXX: ???
-    }
+    };
 
     if ( $result ) {
         print "ok $TestCounter\n";

@@ -67,8 +67,6 @@ ok( ref $vos && $vos->isa( q{AFS::Command::VOS} ), q{AFS::Command::VOS->new} );
 my $volname          = qq{$volname_prefix.basic.$PID};
 my $volname_readonly = qq{$volname.readonly};
 
-$Volnames{$volname}++;
-
 ok(
     $vos->create(
         server    => $server_primary,
@@ -191,16 +189,16 @@ ok( $#volnames == 0, q{result->getVolumeNames count} );
 my $volname_queried = $volnames[0];
 ok( $volname eq $volname_queried, q{volname is correct} );
 
-my $vldbentry = $result->getVLDBEntryByName($volname);
+$vldbentry = $result->getVLDBEntryByName($volname);
 ok( ref $vldbentry && $vldbentry->isa("AFS::Object::VLDBEntry"), q{result->getVLDBEntryByName} );
 
-my $rwrite = $vldbentry->rwrite;
+$rwrite = $vldbentry->rwrite;
 my $altentry = $result->getVLDBEntryById($rwrite);
 ok( ref $altentry && $altentry->isa("AFS::Object::VLDBEntry"), q{result->getVLDBEntryById} );
 ok( $altentry->rwrite == $rwrite, q{altentry->rwrite} );
 ok( $altentry->name eq $volname, q{altentry->name} );
 
-my @vldbsites = $vldbentry->getVLDBSites;
+@vldbsites = $vldbentry->getVLDBSites;
 ok( $#vldbsites == ($#servers+1), q{vldbentry->getVLDBSites count} );
 
 for ( my $index = 0 ; $index <= $#vldbsites ; $index++ ) {
@@ -615,7 +613,7 @@ foreach my $name ( sort @names ) {
 
 # Since we trust examine by this point, we can examine the one online
 # volume we kept track of, and make sure the headers match.
-my $volname = $volume_online->name;
+$volname = $volume_online->name;
 
 my $examine = $vos->examine(
    id   => $volname,
@@ -623,7 +621,7 @@ my $examine = $vos->examine(
 );
 ok( ref $examine && $examine->isa( q{AFS::Object::Volume} ), q{vos->examine} );
 
-my @headers = $examine->getVolumeHeaders;
+@headers = $examine->getVolumeHeaders;
 ok( @headers, q{examine->getVolumeHeaders} );
 
 my $volume_header = q{};
