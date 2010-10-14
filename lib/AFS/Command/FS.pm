@@ -28,11 +28,11 @@ sub checkservers {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
     my @servers = ();
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
@@ -41,7 +41,7 @@ sub checkservers {
         }
 
         if ( m{These servers are still down:}ms ) {
-            while ( defined($_ = $self->handle->getline) ) {
+            while ( defined($_ = $self->_handle->getline) ) {
                 s{^\s+}{}gms;
                 s{\s+$}{}gms;
                 push @servers, $_;
@@ -51,7 +51,7 @@ sub checkservers {
 
     $result->_setAttribute( servers => \@servers );
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -103,14 +103,14 @@ sub _paths_method {
     my $pathkey = $operation eq q{storebehind} ? q{files} : q{path};
 
     $self->_parse_arguments(%args);
-    $self->_exec_cmds( stderr => q{stdout} );
+    $self->_exec_commands( stderr => q{stdout} );
 
     my @paths = ref $args{$pathkey} eq q{ARRAY} ? @{$args{$pathkey}} : ($args{$pathkey});
     my %paths = map { $_ => 1 } @paths;
 
     my $default = undef; # Used by storebehind
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         next if m{^Volume Name}ms;
 
@@ -143,7 +143,7 @@ sub _paths_method {
 
                     my $type = 0;
 
-                    while ( defined($_ = $self->handle->getline) ) {
+                    while ( defined($_ = $self->_handle->getline) ) {
 
                         s{^\s+}{}gms;
                         s{\s+$}{}gms;
@@ -292,7 +292,7 @@ sub _paths_method {
                     # "Message of the day" and "Offline reason" output for
                     # now.  Read until we hit a blank line.
                     #
-                    while ( defined($_ = $self->handle->getline) ) {
+                    while ( defined($_ = $self->_handle->getline) ) {
 
                         last if m{^\s*$}ms;
 
@@ -354,7 +354,7 @@ sub _paths_method {
 
     }
 
-    $self->_reap_cmds( allowstatus => 1 );
+    $self->_reap_commands( allowstatus => 1 );
 
     return $result;
 
@@ -371,9 +371,9 @@ sub exportafs {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         given ( $_ ) {
             when ( m{translator is (currently )?enabled}ms ) {
                 $result->_setAttribute( enabled => 1 );
@@ -402,7 +402,7 @@ sub exportafs {
         }
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -420,9 +420,9 @@ sub getcacheparms {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         if ( m{using (\d+) of the cache.s available (\d+) 1K}ms ) {
             $result->_setAttribute(
                 used  => $1,
@@ -431,7 +431,7 @@ sub getcacheparms {
         }
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -449,9 +449,9 @@ sub getcellstatus {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         if ( m{Cell (\S+) status: (no )?setuid allowed}ms ) {
             my $cell = AFS::Object::Cell->new(
                 cell   => $1,
@@ -461,7 +461,7 @@ sub getcellstatus {
         }
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -479,11 +479,11 @@ sub getclientaddrs {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
     my @addresses = ();
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         chomp;
         s{^\s+}{}ms;
         s{\s+$}{}ms;
@@ -492,7 +492,7 @@ sub getclientaddrs {
 
     $result->_setAttribute( addresses => \@addresses );
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -510,15 +510,15 @@ sub getcrypt {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         if ( m{Security level is currently (crypt|clear)}ms ) {
             $result->_setAttribute( crypt => $1 eq q{crypt} ? 1 : 0 );
         }
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -536,9 +536,9 @@ sub getserverprefs {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         s{^\s+}{}gms;
         s{\s+$}{}gms;
@@ -554,7 +554,7 @@ sub getserverprefs {
 
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -572,9 +572,9 @@ sub listaliases {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         if ( m{Alias (.*) for cell (.*)}ms ) {
             my $cell = AFS::Object::Cell->new(
                 cell  => $2,
@@ -584,7 +584,7 @@ sub listaliases {
         }
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -602,9 +602,9 @@ sub listcells {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         if ( m{^Cell (\S+) on hosts (.*)\.$}ms ) {
             my $cell = AFS::Object::Cell->new(
                 cell    => $1,
@@ -614,7 +614,7 @@ sub listcells {
         }
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -631,12 +631,12 @@ sub lsmount {
     $self->operation( q{lsmount} );
 
     $self->_parse_arguments(%args);
-    $self->_exec_cmds( stderr => q{stdout} );
+    $self->_exec_commands( stderr => q{stdout} );
 
     my @dirs = ref $args{dir} eq q{ARRAY} ? @{$args{dir}} : ($args{dir});
     my %dirs = map { $_ => 1 } @dirs;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         my $current = shift @dirs;
         delete $dirs{$current};
@@ -652,7 +652,7 @@ sub lsmount {
                 $path->_setAttribute( error => $_ );
             }
             when ( m{fs: you may not use \'.\'}ms ) {
-                $_ .= $self->{handle}->getline;
+                $_ .= $self->_handle->getline;
                 $path->_setAttribute( error => $_ );
             }
             when ( m{\'(.*?)\' is not a mount point}ms ) {
@@ -692,7 +692,7 @@ sub lsmount {
         $result->_addPath($path);
     }
 
-    $self->_reap_cmds( allowstatus => 1 );
+    $self->_reap_commands( allowstatus => 1 );
 
     return $result;
 
@@ -716,11 +716,11 @@ sub sysname {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
     my @sysname = ();
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         if ( m{Current sysname is \'?([^\']+)\'?}ms ) {
             $result->_setAttribute( sysname => $1 );
@@ -734,7 +734,7 @@ sub sysname {
 
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -752,14 +752,14 @@ sub wscell {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         next if not m{belongs to cell\s+\'(.*)\'}ms;
         $result->_setAttribute( cell => $1 );
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;

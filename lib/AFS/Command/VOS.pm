@@ -20,7 +20,7 @@ use AFS::Object::Transaction;
 sub examine {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::Volume->new;
     my $entry  = AFS::Object::VLDBEntry->new( locked => 0 );
@@ -29,9 +29,9 @@ sub examine {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
@@ -124,7 +124,7 @@ sub examine {
             # from the same volume headers as the one we just matched.
             # Suck data until we get to a blank line.
             #
-            while ( defined($_ = $self->handle->getline) ) {
+            while ( defined($_ = $self->_handle->getline) ) {
 
                 chomp;
 
@@ -206,7 +206,7 @@ sub examine {
 
                 my $boundary = 0;
 
-                while ( defined($_ = $self->handle->getline) ) {
+                while ( defined($_ = $self->_handle->getline) ) {
 
                     chomp;
 
@@ -313,7 +313,7 @@ sub examine {
         #
         if ( m{^\s+number of sites ->\s+(\d+)}ms ) {
 
-            while ( defined($_ = $self->handle->getline) ) {
+            while ( defined($_ = $self->_handle->getline) ) {
 
                 chomp;
 
@@ -353,7 +353,7 @@ sub examine {
 
     $result->_addVLDBEntry($entry);
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -371,11 +371,11 @@ sub listaddrs {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
     if ( $args{printuuid} ) {
 
-        while ( defined($_ = $self->handle->getline) ) {
+        while ( defined($_ = $self->_handle->getline) ) {
 
             chomp;
 
@@ -386,7 +386,7 @@ sub listaddrs {
                 my @addresses = ();
                 my $hostname  = q{};
 
-                while ( defined($_ = $self->handle->getline) ) {
+                while ( defined($_ = $self->_handle->getline) ) {
                     s{^\s*}{}gms;
                     s{\s*$}{}gms;
                     last if m{^\s*$}ms;
@@ -412,7 +412,7 @@ sub listaddrs {
         my @addresses = ();
         my $hostname  = q{};
 
-        while ( defined($_ = $self->handle->getline) ) {
+        while ( defined($_ = $self->_handle->getline) ) {
             chomp;
             s{^\s*}{}gms;
             s{\s*$}{}gms;
@@ -432,7 +432,7 @@ sub listaddrs {
 
     } else {
 
-        while ( defined($_ = $self->handle->getline) ) {
+        while ( defined($_ = $self->_handle->getline) ) {
             chomp;
             s{^\s*}{}gms;
             s{\s*$}{}gms;
@@ -445,7 +445,7 @@ sub listaddrs {
 
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return @result;
@@ -463,9 +463,9 @@ sub listpart {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
@@ -481,7 +481,7 @@ sub listpart {
 
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -501,9 +501,9 @@ sub listvldb {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
@@ -532,7 +532,7 @@ sub listvldb {
 
         my $entry = AFS::Object::VLDBEntry->new( name => $name );
 
-        while ( defined($_ = $self->handle->getline) ) {
+        while ( defined($_ = $self->_handle->getline) ) {
 
             chomp;
 
@@ -553,7 +553,7 @@ sub listvldb {
 
                 my $sites = $1;
 
-                while ( defined($_ = $self->handle->getline) ) {
+                while ( defined($_ = $self->_handle->getline) ) {
 
                     chomp;
 
@@ -593,7 +593,7 @@ sub listvldb {
 
     $result->_setAttribute( locked => $locked );
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -612,13 +612,13 @@ sub listvol {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
     if ( delete $args{extended} ) {
         carp qq{vos listvol: -extended is not supported by this version of the API};
     }
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
@@ -631,7 +631,7 @@ sub listvol {
             total     => $2,
         );
 
-        while ( defined($_ = $self->handle->getline) ) {
+        while ( defined($_ = $self->_handle->getline) ) {
 
             chomp;
 
@@ -668,7 +668,7 @@ sub listvol {
             }
 
             #
-            # We have to handle multiple formats here.  For
+            # We have to _handle multiple formats here.  For
             # now, just parse the "fast" and normal output.
             # Extended is not yet supported.
             #
@@ -708,7 +708,7 @@ sub listvol {
 
             if ( $args{long} or $args{extended} ) {
 
-                while ( defined($_ = $self->handle->getline) ) {
+                while ( defined($_ = $self->_handle->getline) ) {
 
                     given ( $_ ) {
 
@@ -757,7 +757,7 @@ sub listvol {
 
                     }
                     
-                }  # while(defined($_ = $self->handle->getline)) {
+                }  # while(defined($_ = $self->_handle->getline)) {
 
             }
 
@@ -769,7 +769,7 @@ sub listvol {
 
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -787,9 +787,9 @@ sub partinfo {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         next if not m{partition (/vice\w+): (-?\d+)\D+(\d+)$}ms;
         my $partition = AFS::Object::Partition->new(
             partition => $1,
@@ -799,7 +799,7 @@ sub partinfo {
         $result->_addPartition($partition);
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -817,11 +817,11 @@ sub status {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
     my $transaction = undef;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
@@ -888,7 +888,7 @@ sub status {
 
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -943,13 +943,15 @@ sub dump {
 
     $self->_parse_arguments(%args);
 
+    my @commands = @{ $self->_commands };
+
     if ( $filterout ) {
 
         if ( ref $filterout ne q{ARRAY} ) {
             croak qq{Invalid argument 'filterout': must be an ARRAY reference};
         }
 
-        if ( ref($filterout->[0]) eq q{ARRAY} ) {
+        if ( ref $filterout->[0] eq q{ARRAY} ) {
             foreach my $filter ( @$filterout ) {
                 if ( ref $filter ne q{ARRAY} ) {
                     croak(
@@ -957,23 +959,25 @@ sub dump {
                         qq{OR an ARRAY of strings.  See the documentation for details},
                     );
                 }
-                push( @{$self->{cmds}}, $filter );
+                push @commands, $filter;
             }
         } else {
-            push( @{$self->{cmds}}, $filterout );
+            push @commands, $filterout;
         }
 
     };
 
     if ( $gzip ) {
-        push( @{$self->{cmds}}, [ q{gzip}, qq{-$gzip}, q{-c} ] );
+        push @commands, [ q{gzip}, qq{-$gzip}, q{-c} ];
     } elsif ( $bzip2 ) {
-        push( @{$self->{cmds}}, [ q{bzip2}, qq{-$bzip2}, q{-c} ] );
+        push @commands, [ q{bzip2}, qq{-$bzip2}, q{-c} ];
     }
 
+    $self->_commands( \@commands );
+
     $self->_save_stderr;
-    $self->_exec_cmds( stdout => ( $args{file} ? q{/dev/null} : $file ) );
-    $self->_reap_cmds;
+    $self->_exec_commands( stdout => ( $args{file} ? q{/dev/null} : $file ) );
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return 1;
@@ -1019,13 +1023,15 @@ sub restore {
 
     $self->_parse_arguments(%args);
 
+    my @commands = @{ $self->_commands };
+
     if ( $filterin ) {
 
         if ( ref $filterin ne q{ARRAY} ) {
             croak qq{Invalid argument 'filterin': must be an ARRAY reference};
         }
 
-        if ( ref($filterin->[0]) eq q{ARRAY} ) {
+        if ( ref $filterin->[0] eq q{ARRAY} ) {
             foreach my $filter ( @{ $filterin } ) {
                 if ( ref $filter ne q{ARRAY} ) {
                     croak(
@@ -1033,27 +1039,29 @@ sub restore {
                         qq{OR an ARRAY of strings.  See the documentation for details},
                     );
                 }
-                unshift( @{$self->{cmds}}, $filter );
+                unshift @commands, $filter;
             }
         } else {
-            unshift( @{$self->{cmds}}, $filterin );
+            unshift @commands, $filterin;
         }
 
     };
 
     if ( $gunzip ) {
-        unshift( @{$self->{cmds}}, [ q{gunzip}, q{-c} ] );
+        unshift @commands, [ q{gunzip}, q{-c} ];
     } elsif ( $bunzip2 ) {
-        unshift( @{$self->{cmds}}, [ q{bunzip2}, q{-c} ] );
+        unshift @commands, [ q{bunzip2}, q{-c} ];
     }
 
-    $self->_exec_cmds(
+    $self->_commands( \@commands );
+
+    $self->_exec_commands(
         stderr => q{stdout},
-        stdin  => ( $args{file} ? q{/dev/null} : $file ),
+        stdin  => $args{file} ? q{/dev/null} : $file,
     );
 
     $self->_parse_output;
-    $self->_reap_cmds;
+    $self->_reap_commands;
 
     return 1;
 

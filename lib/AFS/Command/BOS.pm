@@ -25,9 +25,9 @@ sub getdate {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
@@ -50,7 +50,7 @@ sub getdate {
 
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -77,11 +77,11 @@ sub getlog {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
     my $log = q{};
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         next if m{^Fetching log file}ms;
         if ( $redirect ) {
             $redirect->print($_);
@@ -98,7 +98,7 @@ sub getlog {
         $result->_setAttribute( log => $log );
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -116,9 +116,9 @@ sub getrestart {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         if ( m{restarts at (.*)}ms || m{restarts (never)}ms ) {
             $result->_setAttribute( restart => $1 );
@@ -128,7 +128,7 @@ sub getrestart {
 
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -146,11 +146,11 @@ sub listhosts {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
     my @hosts = ();
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
@@ -166,7 +166,7 @@ sub listhosts {
 
     $result->_setAttribute( hosts => \@hosts );
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -184,9 +184,9 @@ sub listkeys {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
@@ -210,7 +210,7 @@ sub listkeys {
 
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -228,9 +228,9 @@ sub listusers {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
@@ -240,7 +240,7 @@ sub listusers {
 
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -258,11 +258,11 @@ sub status {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
     my $instance = undef;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
@@ -362,7 +362,7 @@ sub status {
         $result->_addInstance($instance);
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;

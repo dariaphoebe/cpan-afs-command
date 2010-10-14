@@ -7,6 +7,7 @@ use English;
 use Carp;
 
 use File::Basename qw(basename);
+use File::Temp;
 use Date::Format;
 use IO::File;
 use IO::Pipe;
@@ -21,10 +22,18 @@ has q{quiet}      => ( is => q{rw}, isa => q{Int}, default => 0 );
 has q{timestamps} => ( is => q{rw}, isa => q{Int}, default => 0 );
 
 has q{command}    => ( is => q{rw}, isa => q{Str}, lazy_build => 1 );
+has q{errors}     => ( is => q{rw}, isa => q{Str}, default => q{} );
+
+has q{_commands}  => ( is => q{rw}, isa => q{ArrayRef}, default => sub { return []; } );
+has q{_pids}      => ( is => q{rw}, isa => q{HashRef},  default => sub { return {}; } );
 
 has q{operations} => ( is => q{rw}, isa => q{HashRef}, lazy_build => 1 );
 has q{operation_arguments} =>
     ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
+
+has q{_handle} => ( is => q{rw}, isa => q{IO::File} );
+has q{_stderr} => ( is => q{rw}, isa => q{IO::File} );
+has q{_tmpfile} => ( is => q{rw}, isa => q{File::Temp} );
 
 sub _build_command {
     my $self  = shift;
@@ -207,11 +216,10 @@ sub arguments {
     # XXX -- Hack Alert!!!
     #
     # Because the force option to vos release changed from -f to
-    # -force, you can't use the API tranparently with 2 different vos
-    # binaries that support the 2 different options.
-    #
-    # If we need more of these, we can add them, as this let's us
-    # alias one argument to another.
+    # -force, you can't use the API transparently with 2 different vos
+    # binaries that support the 2 different options.  If we need more
+    # of these, we can add them, as this let's us alias one argument
+    # to another.
     #
     if ( $self->isa( q{AFS::Command::VOS} ) and $operation eq q{release} ) {
         if ( exists $arguments->{optional}->{f} ) {
@@ -237,21 +245,17 @@ sub _save_stderr {
 
     my $self = shift;
 
-    $self->{olderr} = IO::File->new(">&STDERR") || 
+    my $olderr = IO::File->new( qq{>&STDERR} ) || 
         croak qq{Unable to dup stderr: $ERRNO};
+    $self->_stderr( $olderr );
 
-    my $command = basename((split /\s+/,@{$self->{command}})[0]);
+    my $tmpfile = File::Temp->new ||
+        croak qq{Unable to create File::Temp object\n};
 
-    $self->{tmpfile} = qq{/tmp/.$command.$self->{operation}.$PID};
-
-    my $newerr = IO::File->new(">$self->{tmpfile}") ||
-        croak qq{Unable to open $self->{tmpfile}: $ERRNO};
-
-    STDERR->fdopen( $newerr->fileno, "w" ) || 
+    STDERR->fdopen( $tmpfile->fileno, q{w} ) || 
         croak qq{Unable to reopen stderr: $ERRNO};
 
-    $newerr->close || 
-        croak qq{Unable to close $self->{tmpfile}: $ERRNO};
+    $self->_tmpfile( $tmpfile );
 
     return 1;
 
@@ -261,30 +265,27 @@ sub _restore_stderr {
 
     my $self = shift;
 
-    STDERR->fdopen( $self->{olderr}->fileno, "w") || 
+    STDERR->fdopen( $self->_stderr->fileno, q{w} ) || 
         croak qq{Unable to restore stderr: $ERRNO};
 
-    $self->{olderr}->close || 
+    $self->_stderr->close || 
         croak qq{Unable to close saved stderr: $ERRNO};
 
-    delete $self->{olderr};
+    my $tmpfile = $self->_tmpfile;
 
-    my $newerr = IO::File->new($self->{tmpfile}) || 
-        croak qq{Unable to reopen $self->{tmpfile}: $ERRNO};
+    my $errors = q{};
 
-    $self->{errors} = "";
-
-    while ( <$newerr> ) {
-        $self->{errors} .= $_;
+    while ( defined($_ = $tmpfile->getline) ) {
+        $errors .= $_;
     }
 
-    $newerr->close || 
-        croak qq{Unable to close $self->{tmpfile}: $ERRNO};
+    $tmpfile->close ||
+        croak qq{Unable to close $tmpfile: $ERRNO\n};
 
-    unlink($self->{tmpfile}) || 
-        croak qq{Unable to unlink $self->{tmpfile}: $ERRNO};
+    $self->_tmpfile( undef );
+    $self->_stderr( undef );
 
-    delete $self->{tmpfile};
+    $self->errors( $errors );
 
     return 1;
 
@@ -293,46 +294,43 @@ sub _restore_stderr {
 sub _parse_arguments {
 
     my $self = shift;
-    my $class = ref($self);
-    my (%args) = @_;
+    my %args = @_;
 
-    my $arguments = $self->_arguments($self->{operation});
+    my $class = ref $self;
 
-    if ( not defined $arguments ) {
-        crap qq{Unable to obtain arguments for $class->$self->{operation}};
-        return;
-    }
+    # XXX: Rework this...
+    my $operation = $self->operation;
+    my $arguments = $self->_arguments( $operation ) ||
+        croak qq{Unable to obtain arguments for $class->$operation};
 
-    $self->{errors} = "";
-
-    $self->{cmds} = [];
+    $self->errors( q{} );
 
     if ( $args{inputfile} ) {
 
-        push( @{$self->{cmds}}, [ 'cat', $args{inputfile} ] );
+        $self->_commands( [ q{cat}, $args{inputfile} ] );
 
     } else {
 
-        my @argv = ( @{$self->{command}}, $self->{operation} );
+        my @commands = ( $self->command, $self->operation );
 
         foreach my $key ( keys %args ) {
-            next unless $arguments->{aliases}->{$key};
+            next if not $arguments->{aliases}->{$key};
             $args{$arguments->{aliases}->{$key}} = delete $args{$key};
         }
 
         foreach my $key ( qw( noauth localauth encrypt ) ) {
-            next unless $self->{$key};
+            next if not $self->$key;
             $args{$key}++ if exists $arguments->{required}->{$key};
             $args{$key}++ if exists $arguments->{optional}->{$key};
         }
 
-        unless ( $self->{quiet} ) {
+        if ( not $self->quiet ) {
             $args{verbose}++ if exists $arguments->{optional}->{verbose};
         }
 
         foreach my $type ( qw( required optional ) ) {
 
-            foreach my $key ( keys %{$arguments->{$type}} ) {
+            foreach my $key ( keys %{ $arguments->{$type} } ) {
 
                 my $hasvalue = $arguments->{$type}->{$key};
 
@@ -346,15 +344,15 @@ sub _parse_arguments {
                         if ( ref $hasvalue ne q{ARRAY} ) {
                             croak qq{Invalid argument '$key': can't provide a list of values};
                         }
-                        push @argv, qq{-$key};
+                        push @commands, qq{-$key};
                         foreach my $value ( ref $args{$key} eq 'HASH' ? %{$args{$key}} : @{$args{$key}} ) {
-                            push @argv, $value;
+                            push @commands, $value;
                         }
                     } else {
-                        push @argv, qq{-$key}, $args{$key};
+                        push @commands, qq{-$key}, $args{$key};
                     }
                 } else {
-                    push @argv, qq{-$key} if $args{$key};
+                    push @commands, qq{-$key} if $args{$key};
                 }
 
                 delete $args{$key};
@@ -364,10 +362,10 @@ sub _parse_arguments {
         }
 
         if ( %args ) {
-            croak( qq{Unsupported arguments: } . join(' ',sort keys %args)) );
+            croak( qq{Unsupported arguments: } . join( q{ }, sort keys %args ) );
         }
 
-        push( @{$self->{cmds}}, \@argv );
+        $self->_commands( \@commands );
 
     }
 
@@ -375,19 +373,18 @@ sub _parse_arguments {
 
 }
 
-sub _exec_cmds {
+sub _exec_commands {
 
     my $self = shift;
-
     my %args = @_;
 
-    my @cmds = @{$self->{cmds}};
+    my @commands = @{ $self->_commands };
 
-    $self->{pids} = {};
+    $self->_pids( {} );
 
-    for ( my $index = 0 ; $index <= $#cmds ; $index++ ) {
+    for ( my $index = 0 ; $index <= $#commands ; $index++ ) {
 
-        my $cmd = $cmds[$index];
+        my $command = $commands[$index];
 
         my $pipe = IO::Pipe->new || 
             croak qq{Unable to create pipe: $ERRNO};
@@ -398,7 +395,7 @@ sub _exec_cmds {
 
         if ( $pid == 0 ) {
 
-            if ( $index == $#cmds && exists $args{stdout} && $args{stdout} ne q{stdout} ) {
+            if ( $index == $#commands and exists $args{stdout} and $args{stdout} ne q{stdout} ) {
                 my $stdout = IO::File->new( qq{>$args{stdout}} ) ||
                     croak qq{Unable to open $args{stdout}: $ERRNO};
                 STDOUT->fdopen( $stdout->fileno, q{w} ) ||
@@ -408,33 +405,33 @@ sub _exec_cmds {
                     croak qq{Unable to redirect stdout: $ERRNO};
             }
 
-            if ( exists $args{stderr} && $args{stderr} eq q{stdout} ) {
+            if ( $args{stderr} eq q{stdout} ) {
                 STDERR->fdopen( STDOUT->fileno, q{w} ) ||
                     croak qq{Unable to redirect stderr: $ERRNO};
             }
 
             if ( $index == 0 ) {
-                if ( exists $args{stdin} && $args{stdin} ne q{stdin} ) {
+                if ( exists $args{stdin} and $args{stdin} ne q{stdin} ) {
                     my $stdin = IO::File->new( qq{<$args{stdin}} ) ||
                         croak qq{Unable to open $args{stdin}: $ERRNO};
                     STDIN->fdopen( $stdin->fileno, q{r} ) ||
                         croak qq{Unable to redirect stdin: $ERRNO};
                 }
             } else {
-                STDIN->fdopen( $self->{handle}->fileno, q{r} ) ||
+                STDIN->fdopen( $self->_handle->fileno, q{r} ) ||
                     croak qq{Unable to redirect stdin: $ERRNO};
             }
 
-            $ENV{TZ} = q{GMT} unless $self->{localtime};
+            $ENV{TZ} = q{GMT} if not $self->localtime;
 
-            exec( { $cmd->[0] } @{$cmd} ) ||
-                croak qq{Unable to exec @{$cmd}: $ERRNO};
+            exec { $command->[0] } @{ $command };
+
+            croak qq{Unable to exec @{$command}: $ERRNO};
 
         }
 
-        $self->{handle} = $pipe->reader;
-
-        $self->{pids}->{$pid} = $cmd;
+        $self->_handle( $pipe->reader );
+        $self->_pids->{$pid} = $command;
 
     }
 
@@ -446,33 +443,28 @@ sub _parse_output {
 
     my $self = shift;
 
-    $self->{errors} = q{};
+    my $errors = q{};
 
-    while ( defined($_ = $self->{handle}->getline) ) {
-        if ( $self->{timestamps} ) {
-            $self->{errors} .= time2str( qq{[%Y-%m-%d %H:%M:%S] }, time, q{GMT} );
+    while ( defined($_ = $self->_handle->getline) ) {
+        if ( $self->timestamps ) {
+            $errors .= time2str( qq{[%Y-%m-%d %H:%M:%S] }, time, q{GMT} );
         }
-        $self->{errors} .= $_;
+        $errors .= $_;
     }
+
+    $self->errors( $errors );
 
     return 1;
 
 }
 
-sub _reap_cmds {
+sub _reap_commands {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
-    my $errors = 0;
-
-    $self->{handle}->close ||
+    $self->_handle->close ||
         croak qq{Unable to close pipe handle: $ERRNO};
-
-    delete $self->{handle};
-    delete $self->{cmds};
-
-    $self->{status} = {};
 
     my %allowstatus = ();
 
@@ -486,31 +478,21 @@ sub _reap_cmds {
         }
     }
 
-    foreach my $pid ( keys %{$self->{pids}} ) {
+    foreach my $pid ( keys %{ $self->_pids } ) {
 
-        $self->{status}->{$pid}->{cmd} =
-          join( q{ }, @{delete $self->{pids}->{$pid}} );
+        if ( not waitpid($pid,0) ) {
+            croak qq{Unable to read child process ($pid)\n};
+        }
 
-        if ( waitpid($pid,0) ) {
-
-            $self->{status}->{$pid}->{status} = $CHILD_ERROR;
-            if ( $CHILD_ERROR ) {
-                if ( %allowstatus ) {
-                    $errors++ unless $allowstatus{ $CHILD_ERROR >> 8 };
-                } else {
-                    $errors++;
-                }
+        if ( $CHILD_ERROR ) {
+            if ( not %allowstatus or not $allowstatus{ $CHILD_ERROR >> 8 } ) {
+                # XXX: Really need the commands string here
+                croak qq{Error running command\n};
             }
-
-
-        } else {
-            $self->{status}->{$pid}->{status} = undef;
-            $errors++;
         }
 
     }
 
-    return if $errors;
     return 1;
 
 }
@@ -526,14 +508,12 @@ sub AUTOLOAD {
     $self->operation( $operation );
 
     $self->_parse_arguments(%args);
-    $self->_exec_cmds( stderr => q{stdout} );
+    $self->_exec_commands( stderr => q{stdout} );
     $self->_parse_output;
-    $self->_reap_cmds;
+    $self->_reap_commands;
 
     return 1;
 
 }
-
-sub DESTROY {}
 
 1;

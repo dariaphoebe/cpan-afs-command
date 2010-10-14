@@ -25,9 +25,9 @@ sub creategroup {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         next if not m{group (\S+) has id (-\d+)}ms;
         my $group = AFS::Object::Group->new(
             name => $1,
@@ -36,7 +36,7 @@ sub creategroup {
         $result->_addGroup($group);
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -54,9 +54,9 @@ sub createuser {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         next if not m{User (\S+) has id (\d+)}ms;
         my $user = AFS::Object::User->new(
             name => $1,
@@ -65,7 +65,7 @@ sub createuser {
         $result->_addUser($user);
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -83,14 +83,14 @@ sub examine {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
         while ( m{,\s*$}ms ) {
-            $_ .= $self->handle->getline;
+            $_ .= $self->_handle->getline;
             chomp;
         }
 
@@ -116,7 +116,7 @@ sub examine {
 
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -134,9 +134,9 @@ sub listentries {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         next if m{^Name}ms;
 
@@ -168,7 +168,7 @@ sub listentries {
 
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -186,9 +186,9 @@ sub listmax {
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
-    $self->_exec_cmds;
+    $self->_exec_commands;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
         next if not m{Max user id is (\d+) and max group id is (-\d+)}ms;
         $result->_setAttribute(
             maxuserid  => $1,
@@ -196,7 +196,7 @@ sub listmax {
         );
     }
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
     $self->_restore_stderr;
 
     return $result;
@@ -213,12 +213,12 @@ sub listowned {
     $self->operation( q{listowned} );
 
     $self->_parse_arguments(%args);
-    $self->_exec_cmds( stderr => q{stdout} );
+    $self->_exec_commands( stderr => q{stdout} );
 
     my $user = undef;
     my $group = undef;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         given ( $_ ) {
 
@@ -256,8 +256,9 @@ sub listowned {
                 # If we see this string, then let the command fail, even
                 # though we might have partial data.
                 #
-                $self->{errors} .= $_;
-                $errors++;
+                # XXX: This needs to be reviewed for modern AFS releases (1.4.12 and beyond)
+                #
+                $self->_errors( $self->_errors . $_ );
 
             }
 
@@ -268,7 +269,7 @@ sub listowned {
     $result->_addUser($user) if $user;
     $result->_addGroup($group) if $group;
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
 
     return $result;
 
@@ -284,12 +285,12 @@ sub membership {
     $self->operation( q{membership} );
 
     $self->_parse_arguments(%args);
-    $self->_exec_cmds( stderr => q{stdout} );
+    $self->_exec_commands( stderr => q{stdout} );
 
     my $user = undef;
     my $group = undef;
 
-    while ( defined($_ = $self->handle->getline) ) {
+    while ( defined($_ = $self->_handle->getline) ) {
 
         given ( $_ ) {
 
@@ -329,8 +330,7 @@ sub membership {
                 # If we see this string, then let the command fail, even
                 # though we might have partial data.
                 #
-                $self->{errors} .= $_;
-                $errors++;
+                $self->_errors( $self->_errors . $_ );
 
             }
 
@@ -341,7 +341,7 @@ sub membership {
     $result->_addUser($user) if $user;
     $result->_addGroup($group) if $group;
 
-    $self->_reap_cmds;
+    $self->_reap_commands;
 
     return $result;
 
