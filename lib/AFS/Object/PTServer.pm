@@ -23,11 +23,11 @@ sub getGroups {
 }
 
 sub getGroupByName {
-    return shift->_groups_byname->{ shift . q{} };
+    return shift->_groups_byname->{ shift(@_) };
 }
 
 sub getGroupById {
-    return shift->_groups_byid->{ shift . q{} };
+    return shift->_groups_byid->{ shift(@_) };
 }
 
 sub getGroup {
@@ -82,11 +82,11 @@ sub getUsers {
 }
 
 sub getUserByName {
-    return shift->_users_byname->{ shift . q{} };
+    return shift->_users_byname->{ shift(@_) };
 }
 
 sub getUserById {
-    return shift->_users_byid->{ shift . q{} };
+    return shift->_users_byid->{ shift(@_) };
 }
 
 sub getUser {

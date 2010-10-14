@@ -15,7 +15,7 @@ sub listAttributes {
 }
 
 sub getAttribute {
-    return shift->_attrs->{ shift . q{} };
+    return shift->_attrs->{ shift(@_) };
 }
 
 sub getAttributes {
@@ -23,7 +23,7 @@ sub getAttributes {
 }
 
 sub hasAttribute {
-    return exists shift->_attrs->{ shift . q{} };
+    return exists shift->_attrs->{ shift(@_) };
 }
 
 sub _setAttribute {

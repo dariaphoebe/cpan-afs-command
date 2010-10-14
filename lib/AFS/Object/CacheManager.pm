@@ -17,7 +17,7 @@ sub getPaths {
 }
 
 sub getPath {
-    return shift->_pathnames->{ shift . q{} };
+    return shift->_pathnames->{ shift(@_) };
 }
 
 sub _addPath {
@@ -35,7 +35,7 @@ sub getCells {
 }
 
 sub getCell {
-    return shift->_cells->{ shift . q{} };
+    return shift->_cells->{ shift(@_) };
 }
 
 sub _addCell {
@@ -53,7 +53,7 @@ sub getServers {
 }
 
 sub getServer {
-    return shift->_servers->{ shift . q{} };
+    return shift->_servers->{ shift(@_) };
 }
 
 sub _addServer {

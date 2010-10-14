@@ -11,9 +11,7 @@ sub getVLDBSites {
 }
 
 sub _addVLDBSite {
-    my $self = shift;
-    my $site = shift;
-    return push @{ $self->_sites }, $site;
+    return push @{ shift->_sites }, shift;
 }
 
 1;

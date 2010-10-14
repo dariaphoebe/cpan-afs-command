@@ -40,7 +40,7 @@ sub getVLDBEntry {
 }
 
 sub getVLDBEntryByName {
-    return shift->_names->{ shift . q{} };
+    return shift->_names->{ shift(@_) };
 }
 
 sub getVLDBEntryById {

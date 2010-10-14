@@ -11,7 +11,7 @@ sub getPrincipals {
 }
 
 sub getRights {
-    return shift->_principals->{ lc( shift ) };
+    return shift->_principals->{ shift(@_) };
 }
 
 sub getEntries {
@@ -19,7 +19,7 @@ sub getEntries {
 }
 
 sub _addEntry {
-    return shift->_principals->{ lc( shift ) } = shift;
+    return shift->_principals->{ shift(@_) } = shift;
 }
 
 1;

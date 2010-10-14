@@ -15,7 +15,7 @@ sub getCommands {
 }
 
 sub getCommand {
-    return shift->_commands->{ shift . q{} };
+    return shift->_commands->{ shift(@_) };
 }
 
 sub _addCommand {

@@ -13,7 +13,7 @@ sub getInstanceNames {
 }
 
 sub getInstance {
-    return shift->_instances->{ shift . q{} }; # prevent auto-quoting
+    return shift->_instances->{ shift(@_) };
 }
 
 sub getInstances {
@@ -31,7 +31,7 @@ sub getFileNames {
 }
 
 sub getFile {
-    return shift->_files->{ shift . q{} };
+    return shift->_files->{ shift(@_) };
 }
 
 sub getFiles {
@@ -49,7 +49,7 @@ sub getKeyIndexes {
 }
 
 sub getKey {
-    return shift->_keys->{ shift . q{} };
+    return shift->_keys->{ shift(@_) };
 }
 
 sub getKeys {

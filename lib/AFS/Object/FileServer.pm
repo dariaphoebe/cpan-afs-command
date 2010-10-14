@@ -15,7 +15,7 @@ sub getPartitions {
 }
 
 sub getPartition {
-    return shift->_partitions->{ shift . q{} };
+    return shift->_partitions->{ shift(@_) };
 }
 
 sub _addPartition {

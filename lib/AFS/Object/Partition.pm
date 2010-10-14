@@ -17,11 +17,11 @@ sub getVolumeNames {
 }
 
 sub getVolumeHeaderById {
-    return shift->_headers_byid->{ shift . q{} };
+    return shift->_headers_byid->{ shift(@_) };
 }
 
 sub getVolumeHeaderByName {
-    return shift->_headers_byname->{ shift . q{} };
+    return shift->_headers_byname->{ shift(@_) };
 }
 
 sub getVolumeHeaders {

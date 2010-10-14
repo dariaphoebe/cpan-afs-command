@@ -17,7 +17,7 @@ sub getPartitions {
 }
 
 sub getPartition {
-    return shift->_partitions->{ shift . q{} };
+    return shift->_partitions->{ shift(@_) };
 }
 
 sub _addPartition {
@@ -35,7 +35,7 @@ sub getVolumes {
 }
 
 sub getTransactionByVolume {
-    return shift->_volumes->{ shift . q{} };
+    return shift->_volumes->{ shift(@_) };
 }
 
 sub _addTransaction {

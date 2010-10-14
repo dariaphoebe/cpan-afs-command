@@ -4,7 +4,7 @@ use Moose;
 use English;
 use Carp;
 
-use extends qw(AFS::Command::Base);
+extends qw(AFS::Command::Base);
 
 use AFS::Object;
 use AFS::Object::VLDB;
