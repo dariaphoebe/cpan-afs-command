@@ -27,6 +27,8 @@ has q{errors}     => ( is => q{rw}, isa => q{Str}, default => q{} );
 has q{_commands}  => ( is => q{rw}, isa => q{ArrayRef}, default => sub { return []; } );
 has q{_pids}      => ( is => q{rw}, isa => q{HashRef},  default => sub { return {}; } );
 
+has q{operation}  => ( is => q{rw}, isa => q{Str}, default => q{} );
+
 has q{operations} => ( is => q{rw}, isa => q{HashRef}, lazy_build => 1 );
 has q{operation_arguments} =>
     ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
@@ -501,7 +503,7 @@ sub _reap_commands {
 sub AUTOLOAD {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $operation = $AUTOLOAD;
     $operation =~ s{.*::}{}ms;
