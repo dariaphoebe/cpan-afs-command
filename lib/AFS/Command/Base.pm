@@ -47,6 +47,8 @@ sub _build_operations {
     my $self = shift;
     my $operation = shift;
 
+    my $class = ref $self;
+
     my %operations = ();
 
     #
@@ -179,7 +181,7 @@ sub arguments {
         while ( defined($_ = $pipe->getline) ) {
 
             if ( m{Unrecognized \s+ operation \s+ '$operation'}msx ) {
-                croak qq{Unsupported @command operation '$operation'};
+                croak qq{Unsupported $command operation '$operation'};
             }
 
             next if not s{^Usage:.*\s+$operation\s+}{}ms;
