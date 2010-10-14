@@ -16,8 +16,8 @@ foreach my $relpath ( qw( . .. ../.. ) ) {
 
 die qq{Unable to locate CONFIG file\n} if not -f $config;
 
-my $fh = IO::File->new( $config ) 
-  die "Unable to open CONFIG file: $ERRNO\n";
+my $fh = IO::File->new( $config ) ||
+  die qq{Unable to open CONFIG file: $ERRNO\n};
 
 while ( defined($_ = $fh->getline) ) {
     next if m{^\#}ms;
