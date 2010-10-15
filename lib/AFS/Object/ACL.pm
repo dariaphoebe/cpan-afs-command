@@ -19,7 +19,11 @@ sub getEntries {
 }
 
 sub _addEntry {
-    return shift->_principals->{ shift(@_) } = shift;
+    # return shift->_principals->{ shift(@_) } = shift;
+    my $self = shift;
+    my $principal = shift;
+    my $rights = shift;
+    $self->_principals->{ $principal } = $rights;
 }
 
 1;

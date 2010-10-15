@@ -244,8 +244,10 @@ sub _save_stderr {
 
     $self->_stderr( $olderr );
 
-    my $tmpfile = File::Temp->new( UNLINK => 0 ) or
-        croak qq{Unable to create File::Temp object\n};
+    my $tmpfile = File::Temp->new(
+        TEMPLATE => q{/tmp/afscmd.stderr.XXXXXXXX},
+        UNLINK   => 0,
+    ) or croak qq{Unable to create File::Temp object\n};
 
     STDERR->fdopen( $tmpfile->fileno, q{w} ) or
         croak qq{Unable to reopen stderr: $ERRNO};
@@ -266,9 +268,11 @@ sub _restore_stderr {
     $self->_stderr->close or
         croak qq{Unable to close saved stderr: $ERRNO};
 
-    $self->errors( read_file( $self->_tmpfile ) );
+    my $tmpfile = $self->_tmpfile;
 
-    unlink $self->_tmpfile or
+    $self->errors( read_file( $tmpfile ) );
+
+    unlink $tmpfile or
         croak qq{Unable to unlink $tmpfile: $ERRNO};
 
     return 1;
@@ -383,7 +387,7 @@ sub _exec_commands {
                     croak qq{Unable to redirect stdout: $ERRNO};
             }
 
-            if ( $args{stderr} eq q{stdout} ) {
+            if ( exists $args{stderr} and $args{stderr} eq q{stdout} ) {
                 STDERR->fdopen( STDOUT->fileno, q{w} ) ||
                     croak qq{Unable to redirect stderr: $ERRNO};
             }
@@ -468,7 +472,7 @@ sub _reap_commands {
     }
 
     if ( $errors ) {
-        croak( $errors, $self->errors );
+        croak( $self->errors, $errors );
     }
 
     return 1;

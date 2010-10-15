@@ -149,7 +149,7 @@ sub _paths_method {
                         s{\s+$}{}gms;
                         last if m{^\s*$}ms;
 
-                        $type = 1, next if m{^Normal rights:}ms;
+                        $type = 1, next  if m{^Normal rights:}ms;
                         $type = -1, next if m{^Negative rights:}ms;
 
                         my ($principal,$rights) = split;

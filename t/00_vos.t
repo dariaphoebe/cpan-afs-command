@@ -302,13 +302,13 @@ ok(
 );
 
 # Finally, one we *expect* to fail...
-#throws_ok {
+throws_ok {
     $result = $vos->examine(
         id   => $volname,
         cell => $cell,
     );
-#} qr{VLDB: no such entry}ms,
-#    q{vos->examine exception};
+} qr{VLDB: no such entry}ms,
+    q{vos->examine exception};
 
 # Dump/restore tests
 

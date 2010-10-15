@@ -5,6 +5,7 @@ use English;
 use Test::More;
 use Test::Exception;
 use Data::Dumper;
+use Try::Tiny;
 
 use lib q{t/lib};
 use Test::AFS::Command;
@@ -90,15 +91,24 @@ foreach my $pathop ( keys %pathops ) {
 # verify all the parsing unless it is actually supported and enabled,
 # so fake it.
 
-# XXX: With exceptions, we might need to use Try::Tiny here
+my $has_exportafs = 1;
 
-$result = $fs->exportafs( type => q{nfs} );
-ok( ref $result && $result->isa( q{AFS::Object::CacheManager} ), q{fs->exportafs} );
+try {
+    $result = $fs->exportafs( type => q{nfs} );
+} catch {
+    $has_exportafs = 0;
+};
+    
+if ( $has_exportafs ) {
 
-ok( defined $result->enabled, q{result->enabled} );
+    ok( ref $result && $result->isa( q{AFS::Object::CacheManager} ), q{fs->exportafs} );
 
-foreach my $attr ( qw(convert uidcheck submounts) ) {
-    ok( defined $result->$attr, qq{result->$attr} );
+    ok( defined $result->enabled, q{result->enabled} );
+
+    foreach my $attr ( qw(convert uidcheck submounts) ) {
+        ok( defined $result->$attr, qq{result->$attr} );
+    }
+
 }
 
 $result = $fs->getcacheparms;
