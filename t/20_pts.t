@@ -54,10 +54,8 @@ foreach my $attr ( qw( maxuserid maxgroupid ) ) {
 
 foreach my $name ( $ptsgroup, $ptsuser ) {
 
-    #
     # First, let's make sure our test IDs aren't defined, so we can
     # redefine them.
-    #
 
     try {
         ok( $pts->delete( nameorid => $name, cell => $cell ), q{pts->delete} );
@@ -122,6 +120,22 @@ ok(
     ),
     q{pts->chown},
 );
+
+throws_ok {
+    $result = $pts->listowned(
+        nameorid => [ $ptsuser ],
+        cell     => $cell,
+    );
+} qr{can.t provide a list of values}ms,
+    q{pts->listowned no longer accepts a list};
+
+throws_ok {
+    $pts->listowned(
+        nameorid => q{nosuchuser},
+        cell     => $cell,
+    );
+} qr{User or group doesn.t exist}ms,
+    q{pts->listowned error handling};
 
 $result = $pts->listowned(
     nameorid => $ptsuser,
