@@ -108,14 +108,14 @@ sub _paths_method {
     my @paths = ref $args{$pathkey} eq q{ARRAY} ? @{$args{$pathkey}} : ($args{$pathkey});
     my %paths = map { $_ => 1 } @paths;
 
-    my $default = undef; # Used by storebehind
+    my $default_asynchrony = undef;
 
     while ( defined($_ = $self->_handle->getline) ) {
 
         next if m{^Volume Name}ms;
 
         if ( m{Default store asynchrony is (\d+) kbytes}ms ) {
-            $default = $1;
+            $default_asynchrony = $1;
             next;
         }
 
@@ -125,182 +125,169 @@ sub _paths_method {
              m{fs: no such cell as \'(.*)\'}ms ||
              m{fs: File \'(.*)\' doesn\'t exist}ms ||
              m{fs: You don\'t have the required access rights on \'(.*)\'}ms ) {
-
-            $path->_setAttribute(
-                path  => $1,
-                error => $_,
-            );
-
+            $path->_setAttribute( path  => $1, error => $_ );
             delete $paths{$1};
             @paths = grep { $_ ne $1 } @paths;
+            $result->_addPath($path);
+            next;
+        }
 
-        } else {
+        if ( $operation eq q{listacl} ) {
 
-            if ( $operation eq q{listacl} ) {
+            if ( m{^Access list for (.*) is}ms ) {
 
-                if ( m{^Access list for (.*) is}ms ) {
+                $path->_setAttribute( path => $1 );
+                delete $paths{$1};
 
-                    $path->_setAttribute( path => $1 );
-                    delete $paths{$1};
+                my %acls = (
+                    normal   => AFS::Object::ACL->new,
+                    negative => AFS::Object::ACL->new,
+                );
 
-                    my $normal   = AFS::Object::ACL->new;
-                    my $negative = AFS::Object::ACL->new;
+                my $type = q{};
 
-                    my $type = 0;
+                while ( defined($_ = $self->_handle->getline) ) {
 
-                    while ( defined($_ = $self->_handle->getline) ) {
+                    chomp;
+                    s{^\s+}{}gms;
+                    s{\s+$}{}gms;
+                    last if not $_;
 
-                        s{^\s+}{}gms;
-                        s{\s+$}{}gms;
-                        last if m{^\s*$}ms;
-
-                        $type = 1, next  if m{^Normal rights:}ms;
-                        $type = -1, next if m{^Negative rights:}ms;
-
+                    if ( m{^(Normal|Negative) rights:}ms ) {
+                        $type = lc($1);
+                    } else {
                         my ($principal,$rights) = split;
-
-                        if ( $type == 1 ) {
-                            $normal->_addEntry( $principal => $rights );
-                        } elsif ( $type == -1 ) {
-                            $negative->_addEntry( $principal => $rights );
-                        }
-
+                        $acls{$type}->_addEntry( $principal => $rights );
                     }
 
-                    $path->_setACLNormal($normal);
-                    $path->_setACLNegative($negative);
-
                 }
+
+                $path->_setACLNormal( $acls{normal} );
+                $path->_setACLNegative( $acls{negative} );
 
             }
 
-            if ( $operation eq q{whichcell} ) {
-                if ( m{^File (\S+) lives in cell \'([^\']+)\'}ms ) {
-                    $path->_setAttribute(
-                        path => $1,
-                        cell => $2,
-                    );
-                    delete $paths{$1};
-                }
-            }
+        }
 
-            if ( $operation eq q{whereis} ) {
-                if ( m{^File (.*) is on hosts? (.*)$}ms ) {
-                    $path->_setAttribute(
-                        path  => $1,
-                        hosts => [split(/\s+/,$2)],
-                    );
-                    delete $paths{$1};
-                }
-            }
-
-            if ( $operation eq q{storebehind} ) {
-                if ( m{Will store (.*?) according to default.}ms ) {
-                    $path->_setAttribute(
-                        path       => $1,
-                        asynchrony => q{default},
-                    );
-                    delete $paths{$1};
-                    @paths = grep { $_ ne $1 } @paths;
-                } elsif ( m{Will store up to (\d+) kbytes of (.*?) asynchronously}ms ) {
-
-                    $path->_setAttribute(
-                        path       => $2,
-                        asynchrony => $1,
-                    );
-                    delete $paths{$2};
-                    @paths = grep { $_ ne $2 } @paths;
-                }
-            }
-
-            if ( $operation eq q{quota} ) {
-                if ( m{^\s*(\d{1,2})%}ms ) {
-                    $path->_setAttribute(
-                        path    => $paths[0],
-                        percent => $1,
-                    );
-                    delete $paths{$paths[0]};
-                    shift @paths;
-                }
-            }
-
-            if ( $operation eq q{listquota} ) {
-                # This is a bit lame.  We want to be lazy and split on white
-                # space, so we get rid of this one annoying instance.
-                s{no limit}{nolimit}gms;
-                my ($volname,$quota,$used,$percent,$partition) = split;
-                $quota     = 0 if $quota eq q{nolimit};
-                $percent   =~ s{\D}{}gms; # want numeric result
-                $partition =~ s{\D}{}gms; # want numeric result
+        if ( $operation eq q{whichcell} ) {
+            if ( m{^File (\S+) lives in cell \'([^\']+)\'}ms ) {
                 $path->_setAttribute(
-                    path      => $paths[0],
-                    volname   => $volname,
-                    quota     => $quota,
-                    used      => $used,
-                    percent   => $percent,
-                    partition => $partition,
+                    path => $1,
+                    cell => $2,
                 );
-                delete $paths{$paths[0]};
-                shift @paths;
+                delete $paths{$1};
             }
+        }
 
-            if ( $operation eq q{diskfree} ) {
-                my ($volname,$total,$used,$avail,$percent) = split;
-                $percent =~ s{%}{}gms; # Don't need it -- want numeric result
+        if ( $operation eq q{whereis} ) {
+            if ( m{^File (.*) is on hosts? (.*)$}ms ) {
+                $path->_setAttribute(
+                    path  => $1,
+                    hosts => [split(/\s+/,$2)],
+                );
+                delete $paths{$1};
+            }
+        }
+
+        if ( $operation eq q{storebehind} ) {
+            if ( m{Will store (.*?) according to default.}ms ) {
+                $path->_setAttribute(
+                    path       => $1,
+                    asynchrony => q{default},
+                );
+                delete $paths{$1};
+            } elsif ( m{Will store up to (\d+) kbytes of (.*?) asynchronously}ms ) {
+                $path->_setAttribute(
+                    path       => $2,
+                    asynchrony => $1,
+                );
+                delete $paths{$2};
+            }
+        }
+
+        if ( $operation eq q{quota} ) {
+            if ( m{^\s*(\d{1,2})%}ms ) {
                 $path->_setAttribute(
                     path    => $paths[0],
-                    volname => $volname,
-                    total   => $total,
-                    used    => $used,
-                    avail   => $avail,
-                    percent => $percent,
+                    percent => $1,
                 );
                 delete $paths{$paths[0]};
                 shift @paths;
             }
+        }
 
-            if ( $operation eq q{examine} ) {
+        if ( $operation eq q{listquota} ) {
+            s{no limit}{0}gms;
+            my ($volname,$quota,$used,$percent,$partition) = split;
+            $percent   =~ s{\D}{}gms;
+            $partition =~ s{\D}{}gms;
+            $path->_setAttribute(
+                path      => $paths[0],
+                volname   => $volname,
+                quota     => $quota,
+                used      => $used,
+                percent   => $percent,
+                partition => $partition,
+            );
+            delete $paths{$paths[0]};
+            shift @paths;
+        }
 
-                if ( m{Volume status for vid = (\d+) named (\S+)}ms ) {
+        if ( $operation eq q{diskfree} ) {
+            my ($volname,$total,$used,$avail,$percent) = split;
+            $percent =~ s{\D}{}gms;
+            $path->_setAttribute(
+                path    => $paths[0],
+                volname => $volname,
+                total   => $total,
+                used    => $used,
+                avail   => $avail,
+                percent => $percent,
+            );
+            delete $paths{$paths[0]};
+            shift @paths;
+        }
 
-                    $path->_setAttribute(
-                        path    => $paths[0],
-                        id      => $1,
-                        volname => $2,
-                    );
+        if ( $operation eq q{examine} ) {
 
-                    #
-                    # Looking at Transarc's code, we can safely assume we'll
-                    # get this output in the order shown. Note we ignore the
-                    # "Message of the day" and "Offline reason" output for
-                    # now.  Read until we hit a blank line.
-                    #
-                    while ( defined($_ = $self->_handle->getline) ) {
+            if ( m{Volume status for vid = (\d+) named (\S+)}ms ) {
 
-                        last if m{^\s*$}ms;
+                $path->_setAttribute(
+                    path    => $paths[0],
+                    id      => $1,
+                    volname => $2,
+                );
 
-                        if ( m{Current disk quota is (\d+|unlimited)}ms ) {
-                            $path->_setAttribute(
-                                quota => $1 eq q{unlimited} ? 0 : $1,
-                            );
-                        }
+                #
+                # Looking at Transarc's code, we can safely assume we'll
+                # get this output in the order shown. Note we ignore the
+                # "Message of the day" and "Offline reason" output for
+                # now.  Read until we hit a blank line.
+                #
+                while ( defined($_ = $self->_handle->getline) ) {
 
-                        if ( m{Current blocks used are (\d+)}ms ) {
-                            $path->_setAttribute( used => $1 );
-                        }
+                    last if m{^\s*$}ms;
 
-                        if ( m{The partition has (\d+) blocks available out of (\d+)}ms ) {
-                            $path->_setAttribute(
-                                avail => $1,
-                                total => $2,
-                            );
-                        }
+                    if ( m{Current disk quota is (\d+|unlimited)}ms ) {
+                        $path->_setAttribute(
+                            quota => $1 eq q{unlimited} ? 0 : $1,
+                        );
                     }
 
-                    delete $paths{$paths[0]};
-                    shift @paths;
+                    if ( m{Current blocks used are (\d+)}ms ) {
+                        $path->_setAttribute( used => $1 );
+                    }
 
+                    if ( m{The partition has (\d+) blocks available out of (\d+)}ms ) {
+                        $path->_setAttribute(
+                            avail => $1,
+                            total => $2,
+                        );
+                    }
                 }
+
+                delete $paths{$paths[0]};
+                shift @paths;
 
             }
 
@@ -311,13 +298,13 @@ sub _paths_method {
     }
 
     if ( $operation eq q{storebehind} ) {
-        $result->_setAttribute( asynchrony => $default );
+        $result->_setAttribute( asynchrony => $default_asynchrony );
         # This is ugly, but we get the default last, and it would be nice
         # to put this value into the Path objects as well, rather than the
         # string 'default'.
         foreach my $path ( $result->getPaths ) {
             if ( $path->asynchrony eq q{default} ) {
-                $path->_setAttribute( asynchrony => $default );
+                $path->_setAttribute( asynchrony => $default_asynchrony );
             }
         }
     }
