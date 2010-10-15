@@ -119,6 +119,7 @@ sub _paths_method {
 
         if ( m{Default store asynchrony is (\d+) kbytes}ms ) {
             $default_asynchrony = $1;
+            $self->debug( qq{Default asynchrony set to $default_asynchrony} );
             next;
         }
 
@@ -194,12 +195,14 @@ sub _paths_method {
 
         if ( $operation eq q{storebehind} ) {
             if ( m{Will store (.*?) according to default.}ms ) {
+                $self->debug( $_ );
                 $path->_setAttribute(
                     path       => $1,
                     asynchrony => q{default},
                 );
                 delete $paths{$1};
             } elsif ( m{Will store up to (\d+) kbytes of (.*?) asynchronously}ms ) {
+                $self->debug( $_ );
                 $path->_setAttribute(
                     path       => $2,
                     asynchrony => $1,

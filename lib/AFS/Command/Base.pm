@@ -38,6 +38,12 @@ has q{_handle}  => ( is => q{rw}, isa => q{IO::Pipe::End} );
 has q{_stderr}  => ( is => q{rw}, isa => q{IO::File} );
 has q{_tmpfile} => ( is => q{rw}, isa => q{Str} );
 
+sub debug {
+    my $self = shift;
+    return if not $ENV{AFS_COMMAND_DEBUG};
+    carp @_;
+}
+
 sub _build_command {
     my $self  = shift;
     my $class = ref $self;
