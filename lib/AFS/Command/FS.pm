@@ -114,6 +114,11 @@ sub _paths_method {
 
         next if m{^Volume Name}ms;
 
+        if ( m{Default store asynchrony is (\d+) kbytes}ms ) {
+            $default = $1;
+            next;
+        }
+
         my $path = AFS::Object::Path->new;
 
         if ( m{fs: Invalid argument; it is possible that (.*) is not in AFS.}ms ||
@@ -190,34 +195,22 @@ sub _paths_method {
             }
 
             if ( $operation eq q{storebehind} ) {
-
-                if ( m{Default store asynchrony is (\d+) kbytes}ms ) {
-
-                    $default = $1;
-                    next;
-
-                } elsif ( m{Will store (.*?) according to default.}ms ) {
-
+                if ( m{Will store (.*?) according to default.}ms ) {
                     $path->_setAttribute(
                         path       => $1,
                         asynchrony => q{default},
                     );
-
                     delete $paths{$1};
                     @paths = grep { $_ ne $1 } @paths;
-
                 } elsif ( m{Will store up to (\d+) kbytes of (.*?) asynchronously}ms ) {
 
                     $path->_setAttribute(
                         path       => $2,
                         asynchrony => $1,
                     );
-
                     delete $paths{$2};
                     @paths = grep { $_ ne $2 } @paths;
-
                 }
-
             }
 
             if ( $operation eq q{quota} ) {
@@ -232,19 +225,13 @@ sub _paths_method {
             }
 
             if ( $operation eq q{listquota} ) {
-
-                #
                 # This is a bit lame.  We want to be lazy and split on white
                 # space, so we get rid of this one annoying instance.
-                #
                 s{no limit}{nolimit}gms;
-
                 my ($volname,$quota,$used,$percent,$partition) = split;
-
                 $quota     = 0 if $quota eq q{nolimit};
                 $percent   =~ s{\D}{}gms; # want numeric result
                 $partition =~ s{\D}{}gms; # want numeric result
-
                 $path->_setAttribute(
                     path      => $paths[0],
                     volname   => $volname,
@@ -255,14 +242,11 @@ sub _paths_method {
                 );
                 delete $paths{$paths[0]};
                 shift @paths;
-
             }
 
             if ( $operation eq q{diskfree} ) {
-
                 my ($volname,$total,$used,$avail,$percent) = split;
                 $percent =~ s{%}{}gms; # Don't need it -- want numeric result
-
                 $path->_setAttribute(
                     path    => $paths[0],
                     volname => $volname,
@@ -273,7 +257,6 @@ sub _paths_method {
                 );
                 delete $paths{$paths[0]};
                 shift @paths;
-
             }
 
             if ( $operation eq q{examine} ) {
@@ -328,14 +311,10 @@ sub _paths_method {
     }
 
     if ( $operation eq q{storebehind} ) {
-
         $result->_setAttribute( asynchrony => $default );
-
-        #
         # This is ugly, but we get the default last, and it would be nice
         # to put this value into the Path objects as well, rather than the
         # string 'default'.
-        #
         foreach my $path ( $result->getPaths ) {
             if ( $path->asynchrony eq q{default} ) {
                 $path->_setAttribute( asynchrony => $default );
@@ -344,14 +323,11 @@ sub _paths_method {
     }
 
     foreach my $pathname ( keys %paths ) {
-
         my $path = AFS::Object::Path->new(
             path  => $pathname,
             error => q{Unable to determine results},
         );
-
         $result->_addPath($path);
-
     }
 
     $self->_reap_commands( allowstatus => 1 );
