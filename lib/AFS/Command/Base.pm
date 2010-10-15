@@ -414,7 +414,7 @@ sub _exec_commands {
             $ENV{TZ} = q{GMT} if not $self->localtime;
 
             exec( { $command->[0] } @{ $command } ) ||
-                croak qq{Unable to exec @{$command}: $ERRNO};
+                croak qq{Unable to exec $command->[0]: $ERRNO};
 
         }
 
@@ -451,34 +451,35 @@ sub _reap_commands {
     my $self = shift;
     my %args = @_;
 
-    $self->_handle->close ||
-        croak qq{Unable to close pipe handle: $ERRNO};
+    $self->_handle->close || croak qq{Unable to close pipe handle: $ERRNO};
 
     my %allowstatus = ();
 
     if ( $args{allowstatus} ) {
-        if ( ref $args{allowstatus} eq q{ARRAY} ) {
-            foreach my $status ( @{$args{allowstatus}} ) {
-                $allowstatus{$status}++;
-            }
-        } else {
-            $allowstatus{$args{allowstatus}}++;
-        }
+        map { $allowstatus{$_}++ } (
+            ref $args{allowstatus} eq q{ARRAY} ? @{ $args{allowstatus} } : $args{allowstatus}
+        );
     }
+
+    my $errors = q{};
 
     foreach my $pid ( keys %{ $self->_pids } ) {
 
         if ( not waitpid($pid,0) ) {
-            croak qq{Unable to read child process ($pid)\n};
+            $errors .= qq{Unable to read child process ($pid)\n};
         }
 
         if ( $CHILD_ERROR ) {
             if ( not %allowstatus or not $allowstatus{ $CHILD_ERROR >> 8 } ) {
-                my $command = join q{ }, @{ $self->_commands };
-                croak qq{Error running command\n};
+                my $command = join q{ }, @{ $self->_pids->{$pid} };
+                $errors .= qq{Error running '$command'\n};
             }
         }
 
+    }
+
+    if ( $errors ) {
+        croak( $errors, $self->errors );
     }
 
     return 1;
