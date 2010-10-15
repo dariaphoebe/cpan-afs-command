@@ -258,7 +258,7 @@ sub listowned {
                 #
                 # XXX: This needs to be reviewed for modern AFS releases (1.4.12 and beyond)
                 #
-                $self->_errors( $self->_errors . $_ );
+                $self->errors( $self->errors . $_ );
 
             }
 
@@ -330,7 +330,7 @@ sub membership {
                 # If we see this string, then let the command fail, even
                 # though we might have partial data.
                 #
-                $self->_errors( $self->_errors . $_ );
+                $self->errors( $self->errors . $_ );
 
             }
 

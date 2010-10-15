@@ -10,6 +10,7 @@ use Data::Dumper;
 
 use File::Basename qw(basename);
 use File::Temp;
+use File::Slurp;
 use Date::Format;
 use IO::File;
 use IO::Pipe;
@@ -36,7 +37,7 @@ has q{_arguments}  => ( is => q{rw}, isa => q{HashRef}, default => sub { return 
 
 has q{_handle}  => ( is => q{rw}, isa => q{IO::Pipe::End} );
 has q{_stderr}  => ( is => q{rw}, isa => q{IO::File} );
-has q{_tmpfile} => ( is => q{rw}, isa => q{File::Temp} );
+has q{_tmpfile} => ( is => q{rw}, isa => q{Str} );
 
 sub _build_command {
     my $self  = shift;
@@ -238,17 +239,18 @@ sub _save_stderr {
 
     my $self = shift;
 
-    my $olderr = IO::File->new( qq{>&STDERR} ) || 
+    my $olderr = IO::File->new( qq{>&STDERR} ) or
         croak qq{Unable to dup stderr: $ERRNO};
+
     $self->_stderr( $olderr );
 
-    my $tmpfile = File::Temp->new ||
+    my $tmpfile = File::Temp->new( UNLINK => 0 ) or
         croak qq{Unable to create File::Temp object\n};
 
-    STDERR->fdopen( $tmpfile->fileno, q{w} ) || 
+    STDERR->fdopen( $tmpfile->fileno, q{w} ) or
         croak qq{Unable to reopen stderr: $ERRNO};
 
-    $self->_tmpfile( $tmpfile );
+    $self->_tmpfile( $tmpfile->filename );
 
     return 1;
 
@@ -258,24 +260,16 @@ sub _restore_stderr {
 
     my $self = shift;
 
-    STDERR->fdopen( $self->_stderr->fileno, q{w} ) || 
+    STDERR->fdopen( $self->_stderr->fileno, q{w} ) or
         croak qq{Unable to restore stderr: $ERRNO};
 
-    $self->_stderr->close || 
+    $self->_stderr->close or
         croak qq{Unable to close saved stderr: $ERRNO};
 
-    my $tmpfile = $self->_tmpfile;
+    $self->errors( read_file( $self->_tmpfile ) );
 
-    my $errors = q{};
-
-    while ( defined($_ = $tmpfile->getline) ) {
-        $errors .= $_;
-    }
-
-    $tmpfile->close ||
-        croak qq{Unable to close $tmpfile: $ERRNO\n};
-
-    $self->errors( $errors );
+    unlink $self->_tmpfile or
+        croak qq{Unable to unlink $tmpfile: $ERRNO};
 
     return 1;
 

@@ -12,10 +12,10 @@ AFS_COMMAND_CELLNAME		= a.rp.nyc.us.test.efs
 AFS_COMMAND_VOLNAME_PREFIX	= afscmd
 
 #
-# Two fileserver:/partition names in which to create volumes.  These
+# The fileserver:/partition names in which to create volumes.  These
 # must be in the same AFS cell as specified at the top of this file.
 #
-AFS_COMMAND_PARTITION_LIST	= rpcore.test.efs:/vicepa rpcore.test.efs:/vicepb
+AFS_COMMAND_PARTITION_LIST	= rpcore.test.efs:/vicepa
 
 #
 # The bos tests need the name of a database server to work with.
