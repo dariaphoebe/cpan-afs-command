@@ -101,6 +101,8 @@ sub _paths_method {
 
     $self->operation( $operation );
 
+    my $default_asynchrony = undef;
+
     my $pathkey = $operation eq q{storebehind} ? q{files} : q{path};
 
     $self->_parse_arguments(%args);
@@ -108,8 +110,6 @@ sub _paths_method {
 
     my @paths = ref $args{$pathkey} eq q{ARRAY} ? @{$args{$pathkey}} : ($args{$pathkey});
     my %paths = map { $_ => 1 } @paths;
-
-    my $default_asynchrony = undef;
 
     while ( defined($_ = $self->_handle->getline) ) {
 
@@ -119,7 +119,6 @@ sub _paths_method {
 
         if ( m{Default store asynchrony is (\d+) kbytes}ms ) {
             $default_asynchrony = $1;
-            $self->debug( qq{Default asynchrony set to $default_asynchrony} );
             next;
         }
 
@@ -195,14 +194,12 @@ sub _paths_method {
 
         if ( $operation eq q{storebehind} ) {
             if ( m{Will store (.*?) according to default.}ms ) {
-                $self->debug( $_ );
                 $path->_setAttribute(
                     path       => $1,
                     asynchrony => q{default},
                 );
                 delete $paths{$1};
             } elsif ( m{Will store up to (\d+) kbytes of (.*?) asynchronously}ms ) {
-                $self->debug( $_ );
                 $path->_setAttribute(
                     path       => $2,
                     asynchrony => $1,
@@ -297,18 +294,6 @@ sub _paths_method {
 
     }
 
-    if ( $operation eq q{storebehind} ) {
-        $result->_setAttribute( asynchrony => $default_asynchrony );
-        # This is ugly, but we get the default last, and it would be nice
-        # to put this value into the Path objects as well, rather than the
-        # string 'default'.
-        foreach my $path ( $result->getPaths ) {
-            if ( $path->asynchrony eq q{default} ) {
-                $path->_setAttribute( asynchrony => $default_asynchrony );
-            }
-        }
-    }
-
     foreach my $pathname ( keys %paths ) {
         my $path = AFS::Object::Path->new(
             path  => $pathname,
@@ -319,7 +304,59 @@ sub _paths_method {
 
     $self->_reap_commands( allowstatus => 1 );
 
+    if ( $operation eq q{storebehind} ) {
+
+        # This is ugly, but we get the default last, and it would be
+        # nice to put this value into the Path objects as well, rather
+        # than the string 'default'.
+
+        if ( not defined $default_asynchrony ) {
+            # It appears that fs storebehind, in older AFS versions,
+            # would always print the default line, but in more recent
+            # versions, the default is only printed if you provide by
+            # arguments.
+            $default_asynchrony = $self->_default_asynchrony;
+        }
+
+        $result->_setAttribute( asynchrony => $default_asynchrony );
+        foreach my $path ( $result->getPaths ) {
+            if ( $path->asynchrony eq q{default} ) {
+                $path->_setAttribute( asynchrony => $default_asynchrony );
+            }
+        }
+
+    }
+
     return $result;
+
+}
+
+sub _default_asynchrony {
+
+    my $self = shift;
+
+    $self->operation( q{storebehind} );
+
+    $self->_parse_arguments;
+    $self->_save_stderr;
+    $self->_exec_commands;
+
+    my $default_asynchrony = undef;
+
+    while ( defined($_ = $self->_handle->getline) ) {
+        if ( m{Default store asynchrony is (\d+) kbytes}ms ) {
+            $default_asynchrony = $1;
+        }
+    }
+
+    $self->_restore_stderr;
+    $self->_reap_commands;
+
+    if ( not defined $default_asynchrony ) {
+        croak qq{Unable to determine default value of asynchrony};
+    }
+
+    return $default_asynchrony;
 
 }
 
