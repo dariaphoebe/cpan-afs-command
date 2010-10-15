@@ -1,6 +1,7 @@
 package AFS::Object::Instance;
 
 use Moose;
+use Carp;
 
 extends qw(AFS::Object);
 
@@ -21,6 +22,7 @@ sub getCommand {
 sub _addCommand {
     my $self = shift;
     my $command = shift;
+    defined( $command->index ) or croak q{Invalid command object};
     return $self->_commands->{ $command->index } = $command;
 }
 

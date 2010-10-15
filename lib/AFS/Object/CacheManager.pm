@@ -1,6 +1,7 @@
 package AFS::Object::CacheManager;
 
 use Moose;
+use Carp;
 
 extends qw(AFS::Object);
 
@@ -23,6 +24,7 @@ sub getPath {
 sub _addPath {
     my $self = shift;
     my $path = shift;
+    $path->path or croak q{Invalid path object};
     return $self->_pathnames->{ $path->path } = $path;
 }
 
@@ -41,6 +43,7 @@ sub getCell {
 sub _addCell {
     my $self = shift;
     my $cell = shift;
+    $cell->cell or croak q{Invalid cell object};
     return $self->_cells->{ $cell->cell } = $cell;
 }
 
@@ -59,6 +62,7 @@ sub getServer {
 sub _addServer {
     my $self = shift;
     my $server = shift;
+    $server->server or croak q{Invalid server object};
     return $self->_servers->{ $server->server } = $server;
 }
 

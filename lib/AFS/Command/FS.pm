@@ -253,13 +253,19 @@ sub _paths_method {
 
         if ( $operation eq q{examine} ) {
 
+            if ( m{File (.*) \(\d+.(.*)\) contained in volume \d+}ms ) {
+                $path->_setAttribute( path => $1, fid  => $2 );
+                $_ = $self->_handle->getline;
+                chomp;
+            }
+
             if ( m{Volume status for vid = (\d+) named (\S+)}ms ) {
 
-                $path->_setAttribute(
-                    path    => $paths[0],
-                    id      => $1,
-                    volname => $2,
-                );
+                if ( not $path->path ) {
+                    $path->_setAttribute( path => $paths[0] );
+                }
+
+                $path->_setAttribute( id => $1, volname => $2 );
 
                 # Note that we ignore the "Message of the day" and
                 # "Offline reason" output for now.  Read until we hit
@@ -288,6 +294,10 @@ sub _paths_method {
 
             }
 
+        }
+
+        if ( not $path->path ) {
+            croak qq{Failed to set path during operation $operation};
         }
 
         $result->_addPath($path);
@@ -320,7 +330,7 @@ sub _paths_method {
 
         $result->_setAttribute( asynchrony => $default_asynchrony );
         foreach my $path ( $result->getPaths ) {
-            if ( $path->asynchrony eq q{default} ) {
+            if ( $path->asynchrony and $path->asynchrony eq q{default} ) {
                 $path->_setAttribute( asynchrony => $default_asynchrony );
             }
         }

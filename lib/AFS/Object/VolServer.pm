@@ -23,6 +23,7 @@ sub getPartition {
 sub _addPartition {
     my $self = shift;
     my $partition = shift;
+    $partition->partition or croak q{Invalid partition object};
     return $self->_partitions->{ $partition->partition } = $partition;
 }
 
@@ -39,20 +40,10 @@ sub getTransactionByVolume {
 }
 
 sub _addTransaction {
-
     my $self = shift;
     my $transaction = shift;
-
-    if ( not ref $transaction or not $transaction->isa( q{AFS::Object::Transaction} ) ) {
-	croak qq{Invalid argument: must be an AFS::Object::Transaction object};
-    }
-
-    if ( not $transaction->volume ) {
-	croak qq{Invalid AFS::Object::Transaction object: has no 'volume' attribute};
-    }
-
+    $transaction->volume or croak qq{Invalid transaction object};
     return $self->_volumes->{ $transaction->volume } = $transaction;
-
 }
 
 1;

@@ -1,6 +1,7 @@
 package AFS::Object::BosServer;
 
 use Moose;
+use Carp;
 
 extends qw(AFS::Object);
 
@@ -23,6 +24,7 @@ sub getInstances {
 sub _addInstance {
     my $self = shift;
     my $instance = shift;
+    $instance->instance or croak q{Invalid instance object};
     return $self->_instances->{ $instance->instance } = $instance;
 }
 
@@ -41,6 +43,7 @@ sub getFiles {
 sub _addFile {
     my $self = shift;
     my $file = shift;
+    $file->file or croak q{Invalid file object};
     return $self->_files->{ $file->file } = $file;
 }
 
@@ -59,6 +62,7 @@ sub getKeys {
 sub _addKey {
     my $self = shift;
     my $key = shift;
+    defined( $key->index ) or croak q{Invalid key object};
     return $self->_keys->{ $key->index } = $key;
 }
 

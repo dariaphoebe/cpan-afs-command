@@ -1,6 +1,7 @@
 package AFS::Object::FileServer;
 
 use Moose;
+use Carp;
 
 extends qw(AFS::Object);
 
@@ -21,6 +22,7 @@ sub getPartition {
 sub _addPartition {
     my $self = shift;
     my $partition = shift;
+    $partition->partition or croak q{Invalid partition object};
     return $self->_partitions->{ $partition->partition } = $partition;
 }
 
