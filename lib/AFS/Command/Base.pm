@@ -48,7 +48,7 @@ sub _build_operations {
     my $self = shift;
     my $operation = shift;
 
-    my $operations = {}
+    my $operations = {};
 
     # This hack is necessary to support the offline/online "hidden"
     # vos commands.  These won't show up in the normal help output, so
