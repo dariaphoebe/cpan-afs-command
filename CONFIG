@@ -1,7 +1,7 @@
 #
 # The name of the AFS cell in which the tests will be performed.
 #
-AFS_COMMAND_CELLNAME		= your.cell.name
+AFS_COMMAND_CELLNAME		= a.rp.nyc.us.test.efs
 
 #
 # This prefix will be used to create and remove a few volumes during
@@ -15,12 +15,12 @@ AFS_COMMAND_VOLNAME_PREFIX	= afscmd.
 # Two fileserver:/partition names in which to create volumes.  These
 # must be in the same AFS cell as specified at the top of this file.
 #
-AFS_COMMAND_PARTITION_LIST	= server1:/vicepa server2:/vicepb
+AFS_COMMAND_PARTITION_LIST	= rpcore.test.efs:/vicepa rpcore.test.efs:/vicepb
 
 #
 # The bos tests need the name of a database server to work with.
 #
-AFS_COMMAND_DBSERVER		= dbserver1
+AFS_COMMAND_DBSERVER		= rpcore.test.efs
 
 #
 # We need a valid pathname (directory) in AFS that we can abuse (that
@@ -28,7 +28,7 @@ AFS_COMMAND_DBSERVER		= dbserver1
 # intrusive things, to test the FS API).  This directory must be in a
 # RW volume, and system:administrators must have write access to it.
 #
-AFS_COMMAND_PATHNAME_AFS	= /afs/your.cell.name/home/you/hackmebaby
+AFS_COMMAND_PATHNAME_AFS	= /afs/a.rp.nyc.us.test.efs/home/efsops
 
 #
 # We will need to create a pts group and user, and if these names are
@@ -47,7 +47,7 @@ AFS_COMMAND_PTS_USER		= afscmduser
 # Yes, I promise the tests will NOT remove this one, 'cause I did
 # all the tests using my own ID. ;-)
 #
-AFS_COMMAND_PTS_EXISTING	= wpm
+AFS_COMMAND_PTS_EXISTING	= efstest
 
 #
 # If you don't have either gzip/gunzip, of bzip2/bunzip2, then comment
@@ -85,3 +85,5 @@ AFS_COMMAND_RESTORE_FILTER	= cat
 #AFS_COMMAND_BINARY_PTS		= /some/path/to/pts
 #AFS_COMMAND_BINARY_FS		= /some/path/to/fs
 
+# This can be used to turn off subsets of the testse
+AFS_COMMAND_DISABLE_TESTS       = none

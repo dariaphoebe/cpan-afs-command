@@ -22,19 +22,18 @@ has q{quiet}      => ( is => q{rw}, isa => q{Int}, default => 0 );
 has q{timestamps} => ( is => q{rw}, isa => q{Int}, default => 0 );
 
 has q{command}    => ( is => q{rw}, isa => q{Str}, lazy_build => 1 );
+has q{operation}  => ( is => q{rw}, isa => q{Str}, default => q{} );
+
 has q{errors}     => ( is => q{rw}, isa => q{Str}, default => q{} );
 
 has q{_commands}  => ( is => q{rw}, isa => q{ArrayRef}, default => sub { return []; } );
 has q{_pids}      => ( is => q{rw}, isa => q{HashRef},  default => sub { return {}; } );
 
-has q{operation}  => ( is => q{rw}, isa => q{Str}, default => q{} );
+has q{_operations} => ( is => q{rw}, isa => q{HashRef}, lazy_build => 1 );
+has q{_arguments}  => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
 
-has q{operations} => ( is => q{rw}, isa => q{HashRef}, lazy_build => 1 );
-has q{operation_arguments} =>
-    ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
-
-has q{_handle} => ( is => q{rw}, isa => q{IO::File} );
-has q{_stderr} => ( is => q{rw}, isa => q{IO::File} );
+has q{_handle}  => ( is => q{rw}, isa => q{IO::Pipe::End} );
+has q{_stderr}  => ( is => q{rw}, isa => q{IO::File} );
 has q{_tmpfile} => ( is => q{rw}, isa => q{File::Temp} );
 
 sub _build_command {
@@ -49,17 +48,13 @@ sub _build_operations {
     my $self = shift;
     my $operation = shift;
 
-    my $class = ref $self;
+    my $operations = {}
 
-    my %operations = ();
-
-    #
     # This hack is necessary to support the offline/online "hidden"
     # vos commands.  These won't show up in the normal help output, so
     # we have to check for them individually.  Since offline and
     # online are implemented as a pair, we can just check one of them,
     # and assume the other is there, too.
-    #
 
     foreach my $type ( qw(default hidden) ) {
 
@@ -100,10 +95,10 @@ sub _build_operations {
                     next if m{Commands \s+ are:}msx;
                     my ($command) = split;
                     next if $command =~ m{^(apropos|help)$}msx;
-                    $operations{$command}++;
+                    $operations->{$command}++;
                 } elsif ( m{^Usage:}msx ) {
-                    $operations{offline}++;
-                    $operations{online}++;
+                    $operations->{offline}++;
+                    $operations->{online}++;
                 }
             }
 
@@ -114,32 +109,29 @@ sub _build_operations {
         }
 
         if ( $CHILD_ERROR ) {
+            my $class = ref $self;
             croak qq{Error running command help. Unable to configure $class\n};
         }
 
     }
 
-    return \%operations;
+    return $operations;
 
 }
 
-sub has_operation {
-    my $self = shift;
-    my $operation = shift;
-    my $operations = $self->operations;
-    return exists $operations->{$operation};
+sub supportsOperation {
+    return shift->_operations->{ shift(@_) };
 }
 
-sub has_argument {
+sub supportsArgument {
     my $self = shift;
     my $operation = shift;
     my $argument = shift;
-    return if not $self->has_operation($operation);
-    my $arguments = $self->arguments($operation);
-    return exists $arguments->{$argument};
+    return if not $self->supportsOperation( $operation );
+    return $self->_operation_arguments( $operation )->{ $argument };
 }
 
-sub arguments {
+sub _operation_arguments {
 
     my $self      = shift;
     my $operation = shift;
@@ -152,14 +144,9 @@ sub arguments {
 
     my $command = $self->command;
 
-    if ( not $self->has_operation($operation) ) {
-        croak qq{Unsupported $command operation '$operation'};
-    }
+    return if not $self->supportsOperation($operation);
 
-    my $operation_arguments = $self->operation_arguments;
-
-    return $operation_arguments->{$operation}
-        if ref $operation_arguments->{$operation} eq q{HASH};
+    return $self->_arguments->{$operation} if $self->_arguments->{$operation};
 
     my $pipe = IO::Pipe->new || croak qq{Unable to create pipe: $ERRNO};
 
@@ -241,7 +228,7 @@ sub arguments {
         croak qq{Error running $command $operation -help.  Unable to configure $command $operation};
     }
 
-    return $operation_arguments->{$operation} = $arguments;
+    return $self->_arguments->{$operation} = $arguments;
 
 }
 
@@ -304,10 +291,8 @@ sub _parse_arguments {
 
     # XXX: Rework this...
     my $operation = $self->operation;
-    my $arguments = $self->_arguments( $operation ) ||
+    my $arguments = $self->_operation_arguments( $operation ) ||
         croak qq{Unable to obtain arguments for $class->$operation};
-
-    $self->errors( q{} );
 
     if ( $args{inputfile} ) {
 
@@ -384,14 +369,14 @@ sub _exec_commands {
 
     my @commands = @{ $self->_commands };
 
+    $self->errors( q{} );
     $self->_pids( {} );
 
     for ( my $index = 0 ; $index <= $#commands ; $index++ ) {
 
         my $command = $commands[$index];
 
-        my $pipe = IO::Pipe->new || 
-            croak qq{Unable to create pipe: $ERRNO};
+        my $pipe = IO::Pipe->new || croak qq{Unable to create pipe: $ERRNO};
 
         my $pid = fork;
 
@@ -489,7 +474,7 @@ sub _reap_commands {
 
         if ( $CHILD_ERROR ) {
             if ( not %allowstatus or not $allowstatus{ $CHILD_ERROR >> 8 } ) {
-                # XXX: Really need the commands string here
+                my $command = join q{ }, @{ $self->_commands };
                 croak qq{Error running command\n};
             }
         }
@@ -500,9 +485,16 @@ sub _reap_commands {
 
 }
 
+use Data::Dumper;
+
 sub AUTOLOAD {
 
     my $self = shift;
+
+#     warn(
+#         qq{AUTOLOAD = $AUTOLOAD\n},
+#         Data::Dumper->Dump( [\@_],[q{args}] ),
+#     );
 
     my $operation = $AUTOLOAD;
     $operation =~ s{.*::}{}ms;

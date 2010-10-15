@@ -89,7 +89,7 @@ foreach my $type ( keys %mtpath ) {
     ok( $fs->mkmount( %mkmount ), qq{fs->mkmount $type} );
 }
 
-$result = $fs->lsmount( dir => [values %mtpath] );
+my $result = $fs->lsmount( dir => [values %mtpath] );
 ok( ref $result && $result->isa( q{AFS::Object::CacheManager} ), q{fs->lsmount} );
 
 foreach my $type ( keys %mtpath ) {
@@ -154,16 +154,6 @@ foreach my $pathname ( @$paths ) {
     } else {
         
         # XXX: This all changes with exceptions
-
-        my $ok = 'ok';
-        unless ( $path->error() ) {
-            warn("Pathname '$pathname' should have given an error()\n");
-            $ok = 'not ok';
-        }
-        for ( my $count = 1 ; $count <= 2 ; $count++ ) {
-            print "$ok $TestCounter\n";
-            $TestCounter++;
-        }
 
     }
 

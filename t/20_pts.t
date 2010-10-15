@@ -53,22 +53,11 @@ foreach my $name ( $ptsgroup, $ptsuser ) {
     #
 
     try {
-        $pts->delete( nameorid => $name, cell => $cell );
+        ok( $pts->delete( nameorid => $name, cell => $cell ), q{pts->delete} );
     } catch {
         my @error = @_;
-        # XXX: ???
+        ok( grep { m{unable to find entry}ms } @error, q{pts->delete} );
     };
-
-    if ( $result ) {
-        print "ok $TestCounter\n";
-    } elsif ( defined($pts->errors()) && $pts->errors() =~ /unable to find entry/ ) {
-        print "ok $TestCounter\n";
-    } else {
-        print "not ok $TestCounter..$TestTotal\n";
-        die("Unable to delete the test pts id ($name), or verify it doesn't exist\n" .
-            Data::Dumper->Dump([$pts],['pts']));
-    }
-    $TestCounter++;
 
     my $method  = $name eq $ptsgroup ? q{creategroup} : q{createuser};
     my $type    = $name eq $ptsgroup ? q{Group}       : q{User};

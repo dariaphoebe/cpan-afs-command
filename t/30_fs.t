@@ -152,7 +152,7 @@ $cellobj = $result->getCell($cell);
 ok( ref $cellobj && $cellobj->isa( q{AFS::Object::Cell} ), q{result->getCell} );
 ok( $cellobj->cell eq $cell, q{cell name matches} );
 
-my $servers = $cellobj->servers;
+$servers = $cellobj->servers;
 ok( ref $servers eq 'ARRAY', q{cellobj->servers} );
 
 $result = $fs->sysname;

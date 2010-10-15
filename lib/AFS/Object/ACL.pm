@@ -7,7 +7,7 @@ extends qw(AFS::Object);
 has q{_principals} => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
 
 sub getPrincipals {
-    return keys %{ shift->_principals} };
+    return keys %{ shift->_principals };
 }
 
 sub getRights {

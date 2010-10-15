@@ -2,7 +2,7 @@ package AFS::Object::Path;
 
 use Moose;
 
-extends base qw(AFS::Object);
+extends qw(AFS::Object);
 
 has q{_acl_normal}   => ( is => q{rw}, isa => q{AFS::Object::ACL} );
 has q{_acl_negative} => ( is => q{rw}, isa => q{AFS::Object::ACL} );

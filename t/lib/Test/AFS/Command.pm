@@ -20,6 +20,7 @@ my $fh = IO::File->new( $config ) ||
   die qq{Unable to open CONFIG file: $ERRNO\n};
 
 while ( defined($_ = $fh->getline) ) {
+    chomp;
     next if m{^\#}ms;
     next if not m{^(\w+)\s*=\s*(.*)\s*$}ms;
     my ($key,$value) = ($1,$2);
