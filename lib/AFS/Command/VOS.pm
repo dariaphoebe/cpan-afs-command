@@ -357,8 +357,8 @@ sub examine {
 
     $result->_addVLDBEntry($entry);
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -449,8 +449,8 @@ sub listaddrs {
 
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return @result;
 
@@ -485,8 +485,8 @@ sub listpart {
 
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -597,8 +597,8 @@ sub listvldb {
 
     $result->_setAttribute( locked => $locked );
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -773,8 +773,8 @@ sub listvol {
 
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -803,8 +803,8 @@ sub partinfo {
         $result->_addPartition($partition);
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -892,8 +892,8 @@ sub status {
 
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -981,8 +981,8 @@ sub dump {
 
     $self->_save_stderr;
     $self->_exec_commands( stdout => ( $args{file} ? q{/dev/null} : $file ) );
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return 1;
 

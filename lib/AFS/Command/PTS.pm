@@ -36,8 +36,8 @@ sub creategroup {
         $result->_addGroup($group);
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -65,8 +65,8 @@ sub createuser {
         $result->_addUser($user);
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -116,8 +116,8 @@ sub examine {
 
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -168,8 +168,8 @@ sub listentries {
 
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -196,8 +196,8 @@ sub listmax {
         );
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 

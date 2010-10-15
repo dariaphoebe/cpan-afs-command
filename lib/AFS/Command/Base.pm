@@ -289,74 +289,70 @@ sub _parse_arguments {
 
     my $class = ref $self;
 
-    # XXX: Rework this...
     my $operation = $self->operation;
     my $arguments = $self->_operation_arguments( $operation ) ||
         croak qq{Unable to obtain arguments for $class->$operation};
 
     if ( $args{inputfile} ) {
-
         $self->_commands( [ q{cat}, $args{inputfile} ] );
+        return 1;
+    }
 
-    } else {
+    my $command = [ $self->command, $self->operation ];
 
-        my @commands = ( $self->command, $self->operation );
+    foreach my $key ( keys %args ) {
+        next if not $arguments->{aliases}->{$key};
+        $args{$arguments->{aliases}->{$key}} = delete $args{$key};
+    }
 
-        foreach my $key ( keys %args ) {
-            next if not $arguments->{aliases}->{$key};
-            $args{$arguments->{aliases}->{$key}} = delete $args{$key};
-        }
+    foreach my $key ( qw( noauth localauth encrypt ) ) {
+        next if not $self->$key;
+        $args{$key}++ if exists $arguments->{required}->{$key};
+        $args{$key}++ if exists $arguments->{optional}->{$key};
+    }
 
-        foreach my $key ( qw( noauth localauth encrypt ) ) {
-            next if not $self->$key;
-            $args{$key}++ if exists $arguments->{required}->{$key};
-            $args{$key}++ if exists $arguments->{optional}->{$key};
-        }
+    if ( not $self->quiet ) {
+        $args{verbose}++ if exists $arguments->{optional}->{verbose};
+    }
 
-        if ( not $self->quiet ) {
-            $args{verbose}++ if exists $arguments->{optional}->{verbose};
-        }
+    foreach my $type ( qw( required optional ) ) {
 
-        foreach my $type ( qw( required optional ) ) {
+        foreach my $key ( keys %{ $arguments->{$type} } ) {
 
-            foreach my $key ( keys %{ $arguments->{$type} } ) {
+            my $hasvalue = $arguments->{$type}->{$key};
 
-                my $hasvalue = $arguments->{$type}->{$key};
-
-                if ( not exists $args{$key} ) {
-                    next if $type ne q{required};
-                    croak qq{Required argument '$key' not provided};
-                }
-
-                if ( $hasvalue ) {
-                    if ( ref $args{$key} eq q{HASH} || ref $args{$key} eq q{ARRAY} ) {
-                        if ( ref $hasvalue ne q{ARRAY} ) {
-                            croak qq{Invalid argument '$key': can't provide a list of values};
-                        }
-                        push @commands, qq{-$key};
-                        foreach my $value ( ref $args{$key} eq 'HASH' ? %{$args{$key}} : @{$args{$key}} ) {
-                            push @commands, $value;
-                        }
-                    } else {
-                        push @commands, qq{-$key}, $args{$key};
-                    }
-                } else {
-                    push @commands, qq{-$key} if $args{$key};
-                }
-
-                delete $args{$key};
-
+            if ( not exists $args{$key} ) {
+                next if $type ne q{required};
+                croak qq{Required argument '$key' not provided};
             }
 
-        }
+            if ( $hasvalue ) {
+                if ( ref $args{$key} eq q{HASH} || ref $args{$key} eq q{ARRAY} ) {
+                    if ( ref $hasvalue ne q{ARRAY} ) {
+                        croak qq{Invalid argument '$key': can't provide a list of values};
+                    }
+                    push @{ $command }, qq{-$key};
+                    foreach my $value ( ref $args{$key} eq q{HASH} ? %{$args{$key}} : @{$args{$key}} ) {
+                        push @{ $command }, $value;
+                    }
+                } else {
+                    push @{ $command }, qq{-$key}, $args{$key};
+                }
+            } else {
+                push @{ $command }, qq{-$key} if $args{$key};
+            }
 
-        if ( %args ) {
-            croak( qq{Unsupported arguments: } . join( q{ }, sort keys %args ) );
-        }
+            delete $args{$key};
 
-        $self->_commands( \@commands );
+        }
 
     }
+
+    if ( %args ) {
+        croak( qq{Unsupported arguments: } . join( q{ }, sort keys %args ) );
+    }
+
+    $self->_commands( $command );
 
     return 1;
 

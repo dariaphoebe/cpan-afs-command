@@ -51,8 +51,8 @@ sub checkservers {
 
     $result->_setAttribute( servers => \@servers );
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -402,8 +402,8 @@ sub exportafs {
         }
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -431,8 +431,8 @@ sub getcacheparms {
         }
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -461,8 +461,8 @@ sub getcellstatus {
         }
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -492,8 +492,8 @@ sub getclientaddrs {
 
     $result->_setAttribute( addresses => \@addresses );
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -518,8 +518,8 @@ sub getcrypt {
         }
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -554,8 +554,8 @@ sub getserverprefs {
 
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -584,8 +584,8 @@ sub listaliases {
         }
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -614,8 +614,8 @@ sub listcells {
         }
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -734,8 +734,8 @@ sub sysname {
 
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -759,8 +759,8 @@ sub wscell {
         $result->_setAttribute( cell => $1 );
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 

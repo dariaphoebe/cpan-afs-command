@@ -50,8 +50,8 @@ sub getdate {
 
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -97,8 +97,8 @@ sub getlog {
         $result->_setAttribute( log => $log );
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -127,8 +127,8 @@ sub getrestart {
 
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -165,8 +165,8 @@ sub listhosts {
 
     $result->_setAttribute( hosts => \@hosts );
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -209,8 +209,8 @@ sub listkeys {
 
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -239,8 +239,8 @@ sub listusers {
 
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
@@ -361,8 +361,8 @@ sub status {
         $result->_addInstance($instance);
     }
 
-    $self->_reap_commands;
     $self->_restore_stderr;
+    $self->_reap_commands;
 
     return $result;
 
