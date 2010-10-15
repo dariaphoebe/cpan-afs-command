@@ -18,13 +18,13 @@ if ( $ENV{AFS_COMMAND_DISABLE_TESTS} =~ /\bbos\b/ ) {
     plan skip_all => q{No cell name configured};
 }
 
-my $cell = $AFS::Command::Tests::Config{AFS_COMMAND_CELLNAME} || 
+my $cell = $ENV{AFS_COMMAND_CELLNAME} || 
     die qq{Missing configuration variable AFS_COMMAND_CELLNAME\n};
 
-my $dbserver = $AFS::Command::Tests::Config{AFS_COMMAND_DBSERVER} ||
+my $dbserver = $ENV{AFS_COMMAND_DBSERVER} ||
     die qq{Missing configuration variable AFS_COMMAND_PARTITION_LIST\n};
 
-my $binary = $AFS::Command::Tests::Config{AFS_COMMAND_BINARY_BOS} || q{bos};
+my $binary = $ENV{AFS_COMMAND_BINARY_BOS} || q{bos};
 
 my $bos = AFS::Command::BOS->new( command => $binary );
 ok( ref $bos && $bos->isa( q{AFS::Command::BOS} ), q{AFS::Command::BOS->new} );

@@ -6,6 +6,8 @@ use Moose;
 use English;
 use Carp;
 
+use Data::Dumper;
+
 use File::Basename qw(basename);
 use File::Temp;
 use Date::Format;
@@ -294,7 +296,7 @@ sub _parse_arguments {
         croak qq{Unable to obtain arguments for $class->$operation};
 
     if ( $args{inputfile} ) {
-        $self->_commands( [ q{cat}, $args{inputfile} ] );
+        $self->_commands( [ [ q{cat}, $args{inputfile} ] ] );
         return 1;
     }
 
@@ -352,7 +354,7 @@ sub _parse_arguments {
         croak( qq{Unsupported arguments: } . join( q{ }, sort keys %args ) );
     }
 
-    $self->_commands( $command );
+    $self->_commands( [ $command ] );
 
     return 1;
 
@@ -371,6 +373,12 @@ sub _exec_commands {
     for ( my $index = 0 ; $index <= $#commands ; $index++ ) {
 
         my $command = $commands[$index];
+
+        if ( ref $command eq q{ARRAY} ) {
+            warn qq{Command is an ARRAY ref: } . join( q{ }, @$command ) . qq{\n};
+        } else {
+            warn qq{Command is a string: $command\n};
+        }
 
         my $pipe = IO::Pipe->new || croak qq{Unable to create pipe: $ERRNO};
 
@@ -409,7 +417,7 @@ sub _exec_commands {
 
             $ENV{TZ} = q{GMT} if not $self->localtime;
 
-            exec( { $command->[0] } @{ $command } ) ||
+            exec { $command->[0] } @{ $command } or
                 croak qq{Unable to exec $command->[0]: $ERRNO};
 
         }
@@ -467,7 +475,7 @@ sub _reap_commands {
 
         if ( $CHILD_ERROR ) {
             if ( not %allowstatus or not $allowstatus{ $CHILD_ERROR >> 8 } ) {
-                my $command = join q{ }, @{ $self->_pids->{$pid} };
+                my $command = $self->_pids->{$pid};
                 $errors .= qq{Error running '$command'\n};
             }
         }
@@ -481,8 +489,6 @@ sub _reap_commands {
     return 1;
 
 }
-
-use Data::Dumper;
 
 sub AUTOLOAD {
 
