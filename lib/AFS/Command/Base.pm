@@ -43,7 +43,7 @@ sub _build_command {
     return $command;
 }
 
-sub _build_operations {
+sub _build__operations {
 
     my $self = shift;
     my $operation = shift;
