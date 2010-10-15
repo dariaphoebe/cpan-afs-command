@@ -42,6 +42,7 @@ sub checkservers {
 
         if ( m{These servers are still down:}ms ) {
             while ( defined($_ = $self->_handle->getline) ) {
+                chomp;
                 s{^\s+}{}gms;
                 s{\s+$}{}gms;
                 push @servers, $_;
@@ -111,6 +112,8 @@ sub _paths_method {
     my $default_asynchrony = undef;
 
     while ( defined($_ = $self->_handle->getline) ) {
+
+        chomp;
 
         next if m{^Volume Name}ms;
 
@@ -258,32 +261,26 @@ sub _paths_method {
                     volname => $2,
                 );
 
-                #
-                # Looking at Transarc's code, we can safely assume we'll
-                # get this output in the order shown. Note we ignore the
-                # "Message of the day" and "Offline reason" output for
-                # now.  Read until we hit a blank line.
-                #
+                # Note that we ignore the "Message of the day" and
+                # "Offline reason" output for now.  Read until we hit
+                # a blank line.
                 while ( defined($_ = $self->_handle->getline) ) {
 
-                    last if m{^\s*$}ms;
+                    chomp;
+                    last if not $_;
 
-                    if ( m{Current disk quota is (\d+|unlimited)}ms ) {
-                        $path->_setAttribute(
-                            quota => $1 eq q{unlimited} ? 0 : $1,
-                        );
+                    given ( $_ ) {
+                        when ( m{Current disk quota is (\d+|unlimited)}ms ) {
+                            $path->_setAttribute( quota => $1 eq q{unlimited} ? 0 : $1 );
+                        }
+                        when ( m{Current blocks used are (\d+)}ms ) {
+                            $path->_setAttribute( used => $1 );
+                        }
+                        when ( m{The partition has (\d+) blocks available out of (\d+)}ms ) {
+                            $path->_setAttribute( avail => $1, total => $2 );
+                        }
                     }
 
-                    if ( m{Current blocks used are (\d+)}ms ) {
-                        $path->_setAttribute( used => $1 );
-                    }
-
-                    if ( m{The partition has (\d+) blocks available out of (\d+)}ms ) {
-                        $path->_setAttribute(
-                            avail => $1,
-                            total => $2,
-                        );
-                    }
                 }
 
                 delete $paths{$paths[0]};
@@ -387,10 +384,7 @@ sub getcacheparms {
 
     while ( defined($_ = $self->_handle->getline) ) {
         if ( m{using (\d+) of the cache.s available (\d+) 1K}ms ) {
-            $result->_setAttribute(
-                used  => $1,
-                avail => $2,
-            );
+            $result->_setAttribute( used  => $1, avail => $2 );
         }
     }
 
@@ -503,6 +497,7 @@ sub getserverprefs {
 
     while ( defined($_ = $self->_handle->getline) ) {
 
+        chomp;
         s{^\s+}{}gms;
         s{\s+$}{}gms;
 
@@ -538,6 +533,7 @@ sub listaliases {
     $self->_exec_commands;
 
     while ( defined($_ = $self->_handle->getline) ) {
+        chomp;
         if ( m{Alias (.*) for cell (.*)}ms ) {
             my $cell = AFS::Object::Cell->new(
                 cell  => $2,
@@ -568,6 +564,7 @@ sub listcells {
     $self->_exec_commands;
 
     while ( defined($_ = $self->_handle->getline) ) {
+        chomp;
         if ( m{^Cell (\S+) on hosts (.*)\.$}ms ) {
             my $cell = AFS::Object::Cell->new(
                 cell    => $1,
@@ -601,6 +598,7 @@ sub lsmount {
 
     while ( defined($_ = $self->_handle->getline) ) {
 
+        chomp;
         my $current = shift @dirs;
         delete $dirs{$current};
 
@@ -684,6 +682,8 @@ sub sysname {
     my @sysname = ();
 
     while ( defined($_ = $self->_handle->getline) ) {
+
+        chomp;
 
         if ( m{Current sysname is \'?([^\']+)\'?}ms ) {
             $result->_setAttribute( sysname => $1 );
