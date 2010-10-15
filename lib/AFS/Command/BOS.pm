@@ -15,7 +15,7 @@ use AFS::Object::Instance;
 sub getdate {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::BosServer->new;
 
@@ -60,7 +60,7 @@ sub getdate {
 sub getlog {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::BosServer->new;
 
@@ -107,7 +107,7 @@ sub getlog {
 sub getrestart {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::BosServer->new;
 
@@ -137,7 +137,7 @@ sub getrestart {
 sub listhosts {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::BosServer->new;
 
@@ -175,7 +175,7 @@ sub listhosts {
 sub listkeys {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::BosServer->new;
 
@@ -219,7 +219,7 @@ sub listkeys {
 sub listusers {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::BosServer->new;
 
@@ -249,7 +249,7 @@ sub listusers {
 sub status {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::BosServer->new;
 

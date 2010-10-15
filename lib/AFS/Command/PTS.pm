@@ -17,7 +17,7 @@ use AFS::Object::User;
 sub creategroup {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::PTServer->new;
 
@@ -46,7 +46,7 @@ sub creategroup {
 sub createuser {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::PTServer->new;
 
@@ -75,7 +75,7 @@ sub createuser {
 sub examine {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::PTServer->new;
 
@@ -126,7 +126,7 @@ sub examine {
 sub listentries {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::PTServer->new;
 
@@ -178,7 +178,7 @@ sub listentries {
 sub listmax {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::PTServer->new;
 
@@ -206,7 +206,7 @@ sub listmax {
 sub listowned {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::PTServer->new;
 
@@ -278,7 +278,7 @@ sub listowned {
 sub membership {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::PTServer->new;
 

@@ -29,7 +29,7 @@ sub hasAttribute {
 
 sub _setAttribute {
     my $self = shift;
-    my (%data) = @_;
+    my %data = @_;
     foreach my $attr ( keys %data ) {
         $self->_attrs->{$attr} = $data{$attr};
     }

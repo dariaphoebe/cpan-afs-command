@@ -33,7 +33,7 @@ sub getGroupById {
 sub getGroup {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     if ( exists $args{id} && exists $args{name} ) {
         croak qq{Invalid arguments: both of 'id' or 'name' may not be specified};
@@ -92,7 +92,7 @@ sub getUserById {
 sub getUser {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     if ( exists $args{id} && exists $args{name} ) {
         croak qq{Invalid arguments: both of 'id' or 'name' may not be specified};

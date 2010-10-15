@@ -31,7 +31,7 @@ sub getVolumeHeaders {
 sub getVolumeHeader {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     if ( exists $args{id} and exists $args{name} ) {
 	croak qq{Invalid arguments: both of 'id' or 'name' may not be specified};

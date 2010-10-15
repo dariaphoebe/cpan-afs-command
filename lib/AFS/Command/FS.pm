@@ -20,7 +20,7 @@ use AFS::Object::ACL;
 sub checkservers {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::CacheManager->new;
 
@@ -95,7 +95,7 @@ sub _paths_method {
 
     my $self = shift;
     my $operation = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::CacheManager->new;
 
@@ -323,7 +323,7 @@ sub _paths_method {
 sub exportafs {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object->new;
 
@@ -372,7 +372,7 @@ sub exportafs {
 sub getcacheparms {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::CacheManager->new;
 
@@ -398,7 +398,7 @@ sub getcacheparms {
 sub getcellstatus {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::CacheManager->new;
 
@@ -428,7 +428,7 @@ sub getcellstatus {
 sub getclientaddrs {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::CacheManager->new;
 
@@ -459,7 +459,7 @@ sub getclientaddrs {
 sub getcrypt {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::CacheManager->new;
 
@@ -485,7 +485,7 @@ sub getcrypt {
 sub getserverprefs {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::CacheManager->new;
 
@@ -522,7 +522,7 @@ sub getserverprefs {
 sub listaliases {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::CacheManager->new;
 
@@ -553,7 +553,7 @@ sub listaliases {
 sub listcells {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::CacheManager->new;
 
@@ -584,7 +584,7 @@ sub listcells {
 sub lsmount {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::CacheManager->new;
 
@@ -669,7 +669,7 @@ sub monitor {
 sub sysname {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::CacheManager->new;
 
@@ -707,7 +707,7 @@ sub sysname {
 sub wscell {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::CacheManager->new;
 

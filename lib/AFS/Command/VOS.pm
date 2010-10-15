@@ -367,7 +367,7 @@ sub examine {
 sub listaddrs {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my @result = ();
 
@@ -459,7 +459,7 @@ sub listaddrs {
 sub listpart {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::FileServer->new;
 
@@ -495,7 +495,7 @@ sub listpart {
 sub listvldb {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     $self->operation( q{listvldb} );
 
@@ -608,7 +608,7 @@ sub listvldb {
 sub listvol {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::VolServer->new;
 
@@ -783,7 +783,7 @@ sub listvol {
 sub partinfo {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::FileServer->new;
 
@@ -813,7 +813,7 @@ sub partinfo {
 sub status {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     my $result = AFS::Object::VolServer->new;
 
@@ -902,7 +902,7 @@ sub status {
 sub dump {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     $self->operation( q{dump} );
 
@@ -991,7 +991,7 @@ sub dump {
 sub restore {
 
     my $self = shift;
-    my (%args) = @_;
+    my %args = @_;
 
     $self->operation( q{restore} );
 
