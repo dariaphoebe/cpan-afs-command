@@ -50,12 +50,10 @@ sub creategroup {
     $self->_exec_commands;
 
     while ( defined($_ = $self->_handle->getline) ) {
-        next if not m{group (\S+) has id (-\d+)}ms;
-        my $group = AFS::Object::Group->new(
-            name => $1,
-            id   => $2,
-        );
-        $result->_addGroup($group);
+        if ( m{group (\S+) has id (-\d+)}ms ) {
+            my $group = AFS::Object::Group->new( name => $1, id => $2 );
+            $result->_addGroup($group);
+        }
     }
 
     $self->_restore_stderr;
@@ -74,17 +72,25 @@ sub createuser {
 
     $self->operation( q{createuser} );
 
+    # Workaround for dangerous pts createuser bug
+    # See: http://rt.central.org/rt/index.html?q=128343
+    # This simulates the error similar to creategroup
+    if ( $args{id} and $args{id} <  0 ) {
+        croak(
+            qq{pts: argument illegal or out of range because },
+            qq{user id $args{id} was not positive\n},
+        );
+    }
+
     $self->_parse_arguments(%args);
     $self->_save_stderr;
     $self->_exec_commands;
 
     while ( defined($_ = $self->_handle->getline) ) {
-        next if not m{User (\S+) has id (\d+)}ms;
-        my $user = AFS::Object::User->new(
-            name => $1,
-            id   => $2,
-        );
-        $result->_addUser($user);
+        if ( m{User (\S+) has id (\d+)}ms ) {
+            my $user = AFS::Object::User->new( name => $1, id => $2 );
+            $result->_addUser($user);
+        }
     }
 
     $self->_restore_stderr;

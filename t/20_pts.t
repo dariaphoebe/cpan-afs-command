@@ -31,7 +31,7 @@ my $ptsuser = $ENV{AFS_COMMAND_PTS_USER} ||
 my $binary = $ENV{AFS_COMMAND_BINARY_PTS} || q{pts};
 
 my $pts = AFS::Command::PTS->new( command => $binary );
-ok( ref $pts && $pts->isa( q{AFS::Command::PTS} ), q{ AFS::Command::PTS->new} );
+ok( ref $pts && $pts->isa( q{AFS::Command::PTS} ), q{AFS::Command::PTS->new} );
 
 foreach my $unsupported ( qw( interactive sleep source quit ) ) {
     throws_ok {
@@ -43,14 +43,14 @@ foreach my $unsupported ( qw( interactive sleep source quit ) ) {
 my $result = $pts->listmax( cell => $cell );
 ok( ref $result && $result->isa( q{AFS::Object::PTServer} ), q{pts->listmax} );
 
-foreach my $attr ( qw( maxuserid maxgroupid ) ) {
-    my $id = $result->$attr;
-    if ( $attr eq q{maxuserid} ) {
-        ok( $id > 0, qq{result->$attr} );
-    } else {
-        ok( $id < 0, qq{result->$attr} );
-    }
-}
+my $maxuserid  = $result->maxuserid;
+my $maxgroupid = $result->maxgroupid;
+
+ok( $maxuserid > 0,  q{result->maxuserid} );
+ok( $maxgroupid < 0, q{result->maxgroupid} );
+
+my $fakegroupid = $maxgroupid - 1;
+my $fakeuserid  = $maxuserid  + 1;
 
 foreach my $name ( $ptsgroup, $ptsuser ) {
 
@@ -67,6 +67,26 @@ foreach my $name ( $ptsgroup, $ptsuser ) {
     my $method  = $name eq $ptsgroup ? q{creategroup} : q{createuser};
     my $type    = $name eq $ptsgroup ? q{Group}       : q{User};
     my $class   = qq{AFS::Object::$type};
+
+    my $fakename = qq{${name}fake};
+    my $fakeid   = $name eq $ptsgroup ? $fakeuserid : $fakegroupid;
+
+    throws_ok {
+        $pts->$method(
+            name => [ $fakename, qq{${fakename}2} ],
+            cell => $cell,
+        );
+    } qr{can.t provide a list of values}ms,
+        qq{pts->$method list handling forbidden};
+
+    throws_ok {
+        $pts->$method(
+            name => $fakename,
+            id   => $fakeid,
+            cell => $cell,
+        );
+    } qr{argument illegal or out of range}ms,
+        qq{pts->$method id error handlding};
 
     $result = $pts->$method(
         name => $name,

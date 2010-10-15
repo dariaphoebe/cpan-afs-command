@@ -213,10 +213,15 @@ sub _operation_arguments {
 
     #
     # We need to force certain API calls to use a single argument,
-    # instead of a list, due to parsing complexities.
+    # instead of a list, for robustness of error handling.
     #
     if ( $operation eq q{listowned} ) {
         $arguments->{required}->{nameorid} = 1;
+    }
+
+    if ( $operation ~~ [qw( createuser creategroup )] ) {
+        $arguments->{required}->{name} = 1;
+        $arguments->{optional}->{id}   = 1;
     }
 
     #

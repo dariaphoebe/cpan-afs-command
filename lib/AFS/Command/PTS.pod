@@ -56,14 +56,17 @@ The corresponding method invocation looks like:
 
     my $result = $pts->creategroup(
        # Required arguments
-       name   => $name, # OR [ $name1, $name2, ... ]
+       name   => $name,
        # Optional arguments
        owner  => $owner,
-       id     => $id, # OR [ $id1, $id2, ... ]
+       id     => $id,
        cell   => $cell,
        noauth => 1,
        force  => 1,
     );
+
+NOTE: For more robust exception handling of individual group creation,
+this method does NOT support a list of names or ids.
 
 =item Return Values
 
@@ -119,14 +122,17 @@ The corresponding method invocation looks like:
 
     my $result = $pts->createuser(
        # Required arguments
-       name   => $name, # OR [ $name1, $name2, ... ]
+       name   => $name,
        # Optional arguments
        owner  => $owner,
-       id     => $id, # OR [ $id1, $id2, ... ]
+       id     => $id,
        cell   => $cell,
        noauth => 1,
        force  => 1,
     );
+
+NOTE: For more robust exception handling of individual user creation,
+this method does NOT support a list of names or ids.
 
 =item Return Values
 
