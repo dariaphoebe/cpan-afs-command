@@ -94,27 +94,6 @@ objects, such as listvldb, listvol, etc will not be affected.
 
 =head1 INSTANCE METHODS
 
-=head2 errors
-
-XXX: This needs a complete rewrite, since we're swicthing to raising
-exceptions on error.
-
-This method takes no arguments, and it returns a string, containing the
-unparsed errors from the last command method invoked.  This string is
-reset with each subsequent command method invocation.  The string is
-normally the output written to stderr by the process, but in the case
-of unparsed boolean commands, it contains both the stdout as well as
-the stderr output.
-
-    my $result = $vos->examine(
-       id               => $volname,
-       cell             => $cell,
-      );
-    unless ( $result ) {
-        die "Unable to examine volname '$volname' in cell '$cell':" .
-          $vos->errors();
-    }
-
 =head2 supportsOperation
 
 This class method allows the developer to test whether or not any
