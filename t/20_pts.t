@@ -195,5 +195,13 @@ $result = $pts->membership(
 );
 ok( ref $result && $result->isa( q{AFS::Object::PTServer} ), q{pts->membership} );
 
+ok(
+    $pts->delete(
+        nameorid => [ $ptsgroup, $ptsuser ],
+        cell     => $cell,
+    ),
+    q{pts->delete},
+);
+
 done_testing();
 exit 0;
