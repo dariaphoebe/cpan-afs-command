@@ -9,7 +9,7 @@ AFS_COMMAND_CELLNAME		= a.rp.nyc.us.test.efs
 # removed.  Note that a successful test run should remove them, but a
 # failed test run can leave them behind.
 #
-AFS_COMMAND_VOLNAME_PREFIX	= afscmd.
+AFS_COMMAND_VOLNAME_PREFIX	= afscmd
 
 #
 # Two fileserver:/partition names in which to create volumes.  These

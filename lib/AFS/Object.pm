@@ -1,13 +1,14 @@
 package AFS::Object;
 
 use Moose;
+use Carp;
 
 our $AUTOLOAD = q{};
 
 has q{_attrs} => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
 
 sub BUILD {
-    shift->_attrs( { @_ } );
+    shift->_attrs( shift );
 }
 
 sub listAttributes {

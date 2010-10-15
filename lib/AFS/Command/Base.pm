@@ -275,9 +275,6 @@ sub _restore_stderr {
     $tmpfile->close ||
         croak qq{Unable to close $tmpfile: $ERRNO\n};
 
-    $self->_tmpfile( undef );
-    $self->_stderr( undef );
-
     $self->errors( $errors );
 
     return 1;
@@ -374,12 +371,6 @@ sub _exec_commands {
 
         my $command = $commands[$index];
 
-        if ( ref $command eq q{ARRAY} ) {
-            warn qq{Command is an ARRAY ref: } . join( q{ }, @$command ) . qq{\n};
-        } else {
-            warn qq{Command is a string: $command\n};
-        }
-
         my $pipe = IO::Pipe->new || croak qq{Unable to create pipe: $ERRNO};
 
         my $pid = fork;
@@ -475,7 +466,7 @@ sub _reap_commands {
 
         if ( $CHILD_ERROR ) {
             if ( not %allowstatus or not $allowstatus{ $CHILD_ERROR >> 8 } ) {
-                my $command = $self->_pids->{$pid};
+                my $command = join q{ }, @{ $self->_pids->{$pid} };
                 $errors .= qq{Error running '$command'\n};
             }
         }
