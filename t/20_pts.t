@@ -33,6 +33,13 @@ my $binary = $ENV{AFS_COMMAND_BINARY_PTS} || q{pts};
 my $pts = AFS::Command::PTS->new( command => $binary );
 ok( ref $pts && $pts->isa( q{AFS::Command::PTS} ), q{ AFS::Command::PTS->new} );
 
+foreach my $unsupported ( qw( interactive sleep source quit ) ) {
+    throws_ok {
+        $pts->$unsupported;
+    } qr{Unsupported interactive pts operation: $unsupported}ms,
+        qq{unsupported pts->$unsupported};
+}
+
 my $result = $pts->listmax( cell => $cell );
 ok( ref $result && $result->isa( q{AFS::Object::PTServer} ), q{pts->listmax} );
 
@@ -189,11 +196,13 @@ if ( $pts->supportsOperation( q{listentries} ) ) {
 
 }
 
-$result = $pts->membership(
-    nameorid => q{ThisSurelyDoesNotExist},
-    cell     => $cell,
-);
-ok( ref $result && $result->isa( q{AFS::Object::PTServer} ), q{pts->membership} );
+throws_ok {
+    $result = $pts->membership(
+        nameorid => q{ThisSurelyDoesNotExist},
+        cell     => $cell,
+    );
+} qr{pts: User or group doesn.t exist}ms,
+    q{pts->membership fails for a non-existent user};
 
 ok(
     $pts->delete(

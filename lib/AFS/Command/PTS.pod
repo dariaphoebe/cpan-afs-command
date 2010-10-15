@@ -372,12 +372,16 @@ The corresponding method invocation looks like:
 
     my $result = $pts->listowned(
        # Required arguments
-       nameorid => $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
+       nameorid => $nameorid,
        # Optional arguments
        cell     => $cell,
        noauth   => 1,
        force    => 1,
     );
+
+NOTE: In order to parse the output of this command deterministically,
+and provide proper error checking, listowned does NOT accept an ARRAY
+ref for the nameorid argument.
 
 =item Return Values
 

@@ -212,6 +212,14 @@ sub _operation_arguments {
     }
 
     #
+    # We need to force certain API calls to use a single argument,
+    # instead of a list, due to parsing complexities.
+    #
+    if ( $operation eq q{listowned} ) {
+        $arguments->{required}->{nameorid} = 1;
+    }
+
+    #
     # XXX -- Hack Alert!!!
     #
     # Because the force option to vos release changed from -f to

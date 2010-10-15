@@ -1,0 +1,163 @@
+
+=head1 INTRODUCTION
+
+AFS::Command -- An OO wrapper API for the AFS command line utilities (vos, bos, pts, fs)
+
+=head1 SUMMARY
+
+This suite of perl modules implements an API for the command line
+utilities for managing and using the AFS distributed file system.
+
+For example, AFS volumes are managed using the command line utility
+'vos', for which there is currently no programmatic API, in any
+language.  This API is a pure perl wrapper around the command line
+utility, that implements an OO API that allows for the easy
+development of systems management applications for AFS.
+
+AFS is available as both an Open Source product
+(http://www.openafs.org), as well as a commercial version from IBM
+(http://www.ibm.com/software/stormgmt/afs/).  This code is primarily
+developed and testing using OpenAFS, however.
+
+=head1 PREREQUISITES
+
+This module requires perl5.10 or later, as well as an installed AFS
+infrastructure to work with.  The code is pure perl, with no compiled
+components, do it should work on most variants of UNIX.
+
+=head1 INSTALLATION
+
+This module builds like almost everything else on CPAN:
+
+  perl Makefile.PL
+  make
+  make test
+  make install
+
+Before running 'make test', edit the CONFIG file and follow the
+instructions in the comments.  Minimally, you have to specify the AFS
+cell name and at least one AFS file server and one AFS database server
+against which to run the tests, as well as a pathname in AFS where we
+can create mount points.
+
+The test suite will require AFS super-user privileges, so you must
+either be a member of the system:administrators protection group,
+and/or a member of the super users list on the servers.  If you don't
+know what that means, you shouldn't be testing this module, so consult
+your AFS administrators.
+
+See the CONFIG file for more details.  Its pretty verbosely
+documented.
+
+Any failure in the test suite is a cause for concern.  For more
+verbose output, run:
+
+  make test TEST_VERBOSE=1
+
+If you can't determine the source of the problem(s), send the verbose
+test output, along with the output from "perl -V", as well as the
+versions of AFS in use at your site, to the author, and I'll do my
+best to figure out why things are breaking, and if you're lucky,
+actually fix it.
+
+=head1 DOCUMENTATION
+
+Docs for these modules are split across several files, and will be
+installed as man pages.
+
+  man AFS::Command
+
+will provide the general overview of the API, its basic design.  The
+details of the API calls, their arguments, and return values, are
+found in the following documents:
+
+  man AFS::Command::Base
+  man AFS::Command::VOS
+  man AFS::Command::BOS
+  man AFS::Command::PTS
+  man AFS::Command::FS
+  man AFS::Object
+
+=head1 AUTHOR
+
+This code is a product of the demented mind of:
+
+    Phillip Moore <w.phillip.moore@gmail.com>
+
+Feedback, patches, recommendations, adulations, and even flames are
+all welcome.   Feed my ego (or try to shoot it down :-), please...
+
+=head1 Migrating from 1.x to 2.x
+
+Version 2 of the AFS::Command API preserves the majority of the
+version 1 API, however a number of strategic and incompatible changes
+have been made.
+
+=head2 Error handling using exceptions
+
+Version 1 would very rarely ever call die/croak, and the developer was
+required to explicitly error check every call and raise exceptions
+themselves.  Version 2 raies exceptions by default.
+
+In version 1, you were required to do something like this:
+
+    $vos->release( ... ) or die(
+        qq{Unable to vos release something\n},
+        $vos->errors,
+    );
+
+With version 2, a failed $vos->release will result in an exception, so
+all you to do is:
+
+    $vos->release( ... );
+
+If you need to handle the exception, then we recommend using
+Try::Tiny, for example:
+
+    try {
+        $vos->release( ... );
+    } catch {
+        my @errors = @_;
+        # handle the error...
+    };
+
+=head2 Improved error handling for pts commands
+
+It's 2010, and pts B<still> has bogus exit codes.  Unlike all the
+other AFS command line utilities, pts exits with a successful return
+code for most operations.  This behavior also depends on the specific
+pts command.  For example, listowned is broken:
+
+    [root@rpcore ~]# pts listowned nosuch
+    pts: User or group doesn't exist so couldn't look up id for nosuch
+    [root@rpcore ~]# echo $?
+    0
+
+But, examine is not:
+
+    [root@rpcore ~]# pts examine nosuch
+    pts: User or group doesn't exist so couldn't look up id for nosuch
+    [root@rpcore ~]# echo $?
+    1
+
+Even if pts is fixed, this API has to be flexible enough to work with
+older pts commands (we are B<NOT> going to require users of
+AFS::Command to upgrade to the latest OpenAFS release just to use this
+code).
+
+The authors have chosen to optimize AFS::Command for robustness over
+performance, and some of the pts commands no longer accept a list of
+names, in order to make the parsing logic manageable.  This affects
+the use of the following pts commands:
+
+    listowned
+
+The documentation has been updated to make a note of this, but if you
+have code that does something like this:
+
+    my $result = $pts->listowned( nameorid => \@names );
+
+you will need to change that code to loop over the list and query them
+individually.
+
+=cut    

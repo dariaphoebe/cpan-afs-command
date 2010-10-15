@@ -14,6 +14,28 @@ use AFS::Object::Principal;
 use AFS::Object::Group;
 use AFS::Object::User;
 
+sub interactive {
+    return shift->_unsupported( q{interactive} );
+}
+
+sub sleep {
+    return shift->_unsupported( q{sleep} );
+}
+
+sub quit {
+    return shift->_unsupported( q{quit} );
+}
+
+sub source {
+    return shift->_unsupported( q{source} );
+}
+
+sub _unsupported {
+    my $self = shift;
+    my $operation = shift;
+    croak qq{Unsupported interactive pts operation: $operation};
+}
+
 sub creategroup {
 
     my $self = shift;
@@ -215,61 +237,48 @@ sub listowned {
     $self->_parse_arguments(%args);
     $self->_exec_commands( stderr => q{stdout} );
 
-    my $user = undef;
+    my $user  = undef;
     my $group = undef;
 
     while ( defined($_ = $self->_handle->getline) ) {
 
-        given ( $_ ) {
+        if ( m{Groups owned by (\S+) \(id: (-?\d+)\)}ms ) {
 
-            when ( m{Groups owned by (\S+) \(id: (-?\d+)\)}ms ) {
+            my ($name,$id) = ($1,$2);
 
-                $result->_addUser($user)   if $user;
-                $result->_addGroup($group) if $group;
-
-                my ($name,$id) = ($1,$2);
-
-                if ( $id > 0 ) {
-                    $user = AFS::Object::User->new( name => $name, id => $id );
-                    $group = undef;
-                } else {
-                    $user = undef;
-                    $group = AFS::Object::Group->new( name => $name, id => $id );
-                }
-
+            if ( $id > 0 ) {
+                $user = AFS::Object::User->new( name => $name, id => $id );
+            } else {
+                $group = AFS::Object::Group->new( name => $name, id => $id );
             }
 
-            when ( m{^\s+(\S+)\s*}ms ) {
-
+            while ( defined($_ = $self->_handle->getline) ) {
+                chomp;
+                s{^\s+}{}gms;
+                s{\s+$}{}gms;
                 if ( $user ) {
-                    $user->_addOwned($1);
+                    $user->_addOwned($_);
                 } else {
-                    $group->_addOwned($2);
+                    $group->_addOwned($_);
                 }
-
             }
 
-            when ( m{unable to get owner list} ) {
+            $result->_addUser($user)   if $user;
+            $result->_addGroup($group) if $group;
 
-                #
-                # pts still (as of OpenAFS 1.2.8) doesn't have proper exit codes.
-                # If we see this string, then let the command fail, even
-                # though we might have partial data.
-                #
-                # XXX: This needs to be reviewed for modern AFS releases (1.4.12 and beyond)
-                #
-                $self->_errors( $self->_errors . $_ );
-
-            }
-
+        } else {
+            # pts listowned still (as of OpenAFS 1.5.77) doesn't
+            # have proper exit codes.  
+            $self->_errors( $self->_errors . $_ );
         }
 
     }
 
-    $result->_addUser($user) if $user;
-    $result->_addGroup($group) if $group;
-
     $self->_reap_commands;
+
+    if ( $self->_errors ) {
+        croak $self->_errors;
+    }
 
     return $result;
 
@@ -342,6 +351,10 @@ sub membership {
     $result->_addGroup($group) if $group;
 
     $self->_reap_commands;
+
+    if ( $self->_errors ) {
+        croak $self->_errors;
+    }
 
     return $result;
 
