@@ -31,8 +31,6 @@ class.  See that documentation for details.
 
 =item new
 
-=item errors
-
 =item supportsOperation
 
 =item supportsArgument

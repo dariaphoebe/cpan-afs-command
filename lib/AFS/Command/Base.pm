@@ -27,7 +27,7 @@ has q{timestamps} => ( is => q{rw}, isa => q{Int}, default => 0 );
 has q{command}    => ( is => q{rw}, isa => q{Str}, lazy_build => 1 );
 has q{operation}  => ( is => q{rw}, isa => q{Str}, default => q{} );
 
-has q{errors}     => ( is => q{rw}, isa => q{Str}, default => q{} );
+has q{_errors}     => ( is => q{rw}, isa => q{Str}, default => q{} );
 
 has q{_commands}  => ( is => q{rw}, isa => q{ArrayRef}, default => sub { return []; } );
 has q{_pids}      => ( is => q{rw}, isa => q{HashRef},  default => sub { return {}; } );
@@ -270,7 +270,7 @@ sub _restore_stderr {
 
     my $tmpfile = $self->_tmpfile;
 
-    $self->errors( read_file( $tmpfile ) );
+    $self->_errors( read_file( $tmpfile ) );
 
     unlink $tmpfile or
         croak qq{Unable to unlink $tmpfile: $ERRNO};
@@ -362,7 +362,7 @@ sub _exec_commands {
 
     my @commands = @{ $self->_commands };
 
-    $self->errors( q{} );
+    $self->_errors( q{} );
     $self->_pids( {} );
 
     for ( my $index = 0 ; $index <= $#commands ; $index++ ) {
@@ -433,7 +433,7 @@ sub _parse_output {
         $errors .= $_;
     }
 
-    $self->errors( $errors );
+    $self->_errors( $errors );
 
     return 1;
 
@@ -472,7 +472,7 @@ sub _reap_commands {
     }
 
     if ( $errors ) {
-        croak( $self->errors, $errors );
+        croak( $self->_errors, $errors );
     }
 
     return 1;
