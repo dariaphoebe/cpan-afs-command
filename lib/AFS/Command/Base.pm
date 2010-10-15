@@ -22,7 +22,6 @@ has q{noauth}     => ( is => q{rw}, isa => q{Int}, default => 0 );
 has q{localauth}  => ( is => q{rw}, isa => q{Int}, default => 0 );
 has q{encrypt}    => ( is => q{rw}, isa => q{Int}, default => 0 );
 has q{quiet}      => ( is => q{rw}, isa => q{Int}, default => 0 );
-has q{timestamps} => ( is => q{rw}, isa => q{Int}, default => 0 );
 
 has q{command}    => ( is => q{rw}, isa => q{Str}, lazy_build => 1 );
 has q{operation}  => ( is => q{rw}, isa => q{Str}, default => q{} );
@@ -427,9 +426,6 @@ sub _parse_output {
     my $errors = q{};
 
     while ( defined($_ = $self->_handle->getline) ) {
-        if ( $self->timestamps ) {
-            $errors .= time2str( qq{[%Y-%m-%d %H:%M:%S] }, time, q{GMT} );
-        }
         $errors .= $_;
     }
 
@@ -482,11 +478,6 @@ sub _reap_commands {
 sub AUTOLOAD {
 
     my $self = shift;
-
-#     warn(
-#         qq{AUTOLOAD = $AUTOLOAD\n},
-#         Data::Dumper->Dump( [\@_],[q{args}] ),
-#     );
 
     my $operation = $AUTOLOAD;
     $operation =~ s{.*::}{}ms;

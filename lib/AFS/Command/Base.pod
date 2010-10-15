@@ -74,22 +74,6 @@ application visible noise, just more verbose errors.
 There should be no need to disable verbosity, but for completeness,
 specifying 'quiet' will turn off the default verbose output.
 
-=item timestamps
-
-If this argument is given, then the output collected from the commands
-will be prepended with the date formatted using Date::Format with:
-
-    %Y/%m/%d %H:%M:%S
-
-This is primarily useful for debugging and timing of commands such as
-vos release, which can be very time consuming.  Since we enable
--verbose by default, this option will let us determine the relative
-time required for each step in these complex operations.
-
-This only applies to commands that return simple return values, eg:
-release, restore, etc.  Commands that return complex structures of
-objects, such as listvldb, listvol, etc will not be affected.
-
 =back
 
 =head1 INSTANCE METHODS
