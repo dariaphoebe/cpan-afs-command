@@ -364,6 +364,9 @@ turn contains one or more AFS::Object::VolumeHeader objects,
 as well as an AFS::Object::VLDBEntry, which contains one or
 more AFS::Object::VLDBSite objects.
 
+This method returns a false value if the volume name is not present in
+the VLDB, and raises an exception for all other errors.
+
     my $result = $vos->examine(
        id   => $volname,
        cell => $cell,
@@ -832,7 +835,7 @@ attributes, and contains one or more AFS::Object::VLDBEntry objects,
 which in turn contain AFS::Object::VLDBSite objects, as well as their
 own attributes.
 
-This method returns a false value is the volume name is not present in
+This method returns a false value if the volume name is not present in
 the VLDB, and raises an exception for all other errors.
 
 NOTE: the VLDBEntry and VLDBSite objects are the same as those used by

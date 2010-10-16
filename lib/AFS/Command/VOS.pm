@@ -358,9 +358,14 @@ sub examine {
     $result->_addVLDBEntry($entry);
 
     $self->_restore_stderr;
-    $self->_reap_commands;
 
-    return $result;
+    if ( $self->_errors =~ m{VLDB: no such entry}ms ) {
+        $self->_reap_commands( allowstatus => [ 1, 255 ] );
+        return;
+    } else {
+        $self->_reap_commands;
+        return $result;
+    }
 
 }
 

@@ -77,6 +77,14 @@ ok(
     q{vos->create},
 );
 
+ok( ! $vos->examine( id => q{nosuchvolume}, cell => $cell ),
+    q{vos->examine returns false for no vldb entry} );
+
+throws_ok {
+    $vos->examine( id => q{nosuchvolume}, cell => q{nosuchcell} );
+} qr{can.t find cell nosuchcell's hosts}ms,
+    q{vos->examine raises exception for bogus cell name};
+
 my $result = $vos->examine( id => $volname, cell => $cell );
 ok( ref $result && $result->isa( q{AFS::Object::Volume} ) );
 
@@ -232,6 +240,8 @@ foreach my $force ( qw( none f force ) ) {
     );
 }
 
+
+
 # The volume is released, so now, let's examine the readonly, and make
 # sure we get the correct volume headers.
 $result = $vos->examine(
@@ -302,15 +312,6 @@ ok(
     ),
     q{vos->remove},
 );
-
-# Finally, one we *expect* to fail...
-throws_ok {
-    $result = $vos->examine(
-        id   => $volname,
-        cell => $cell,
-    );
-} qr{VLDB: no such entry}ms,
-    q{vos->examine exception};
 
 # Dump/restore tests
 
