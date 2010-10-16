@@ -593,7 +593,7 @@ sub listvldb {
 
     $self->_restore_stderr;
 
-    if ( $self->_error =~ m{VLDB: no such entry}ms ) {
+    if ( $self->_errors =~ m{VLDB: no such entry}ms ) {
         $self->_reap_commands( allowstatus => 1 );
         return;
     } else {
