@@ -511,14 +511,14 @@ sub listvldb {
 
         chomp;
 
-        next if m{^\s*$}ms; # If it starts with a blank line, then
-                            # its not a volume name.
-        #
+
+        # If it starts with a blank line, then its not a volume name.
+        next if m{^\s*$}ms;
+
         # Skip the introductory lines of the form:
         # "VLDB entries for all servers"
         # "VLDB entries for server ny91af01"
         # "VLDB entries for server ny91af01 partition /vicepa"
-        #
         next if m{^VLDB entries for }ms;
 
         s{\s+$}{}gms;              # Might be trailing whitespace...
@@ -541,12 +541,6 @@ sub listvldb {
             chomp;
 
             last if m{^\s*$}ms;    # Volume info ends with a blank line
-
-            #
-            # Code to parse this output lives in examine.pl.  This
-            # will need to be made generic and used here to parse and
-            # return the full vldb entry.
-            #
 
             if ( m{RWrite:\s+(\d+)}ms ) { $entry->_setAttribute( rwrite => $1 ); }
             if ( m{ROnly:\s+(\d+)}ms )  { $entry->_setAttribute( ronly  => $1 ); }
@@ -598,9 +592,14 @@ sub listvldb {
     $result->_setAttribute( locked => $locked );
 
     $self->_restore_stderr;
-    $self->_reap_commands;
 
-    return $result;
+    if ( $self->_error =~ m{VLDB: no such entry}ms ) {
+        $self->_reap_commands( allowstatus => 1 );
+        return;
+    } else {
+        $self->_reap_commands;
+        return $result;
+    }
 
 }
 

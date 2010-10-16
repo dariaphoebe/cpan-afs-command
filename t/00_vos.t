@@ -56,7 +56,7 @@ foreach my $serverpart ( split m{\s+}msx, $partition_list ) {
     $server_primary    ||= $server;
     $partition_primary ||= $partition;
 
-    push @servers, $server;
+    push @servers,    $server;
     push @partitions, $partition;
 
 }
@@ -77,10 +77,7 @@ ok(
     q{vos->create},
 );
 
-my $result = $vos->examine(
-   id   => $volname,
-   cell => $cell,
-);
+my $result = $vos->examine( id => $volname, cell => $cell );
 ok( ref $result && $result->isa( q{AFS::Object::Volume} ) );
 
 # First, sanity check the volume header.  There should be ONE of them only.
@@ -177,10 +174,15 @@ for ( my $index = 0 ; $index <= $#servers ; $index++ ) {
     );
 }
 
-$result = $vos->listvldb(
-    name => $volname,
-    cell => $cell,
-);
+ok( not $vos->listvldb( name => q{nosuchvolume}, cell => $cell ),
+    q{vos->listvldb returns false for no vldb entry} );
+
+throws_ok {
+    $vos->listvldb( name => q{nosuchvolume}, cell => q{nosuchcell} );
+} qr{can.t find cell nosuchcell's hosts}ms,
+    q{vos->listvldb raises exception for bogus cell name};
+
+$result = $vos->listvldb( name => $volname, cell => $cell );
 ok( ref $result && $result->isa( q{AFS::Object::VLDB} ), q{vos->listvldb} );
 
 my @volnames = $result->getVolumeNames;
