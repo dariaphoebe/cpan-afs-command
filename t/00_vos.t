@@ -174,7 +174,7 @@ for ( my $index = 0 ; $index <= $#servers ; $index++ ) {
     );
 }
 
-ok( not $vos->listvldb( name => q{nosuchvolume}, cell => $cell ),
+ok( ! $vos->listvldb( name => q{nosuchvolume}, cell => $cell ),
     q{vos->listvldb returns false for no vldb entry} );
 
 throws_ok {
