@@ -832,10 +832,13 @@ attributes, and contains one or more AFS::Object::VLDBEntry objects,
 which in turn contain AFS::Object::VLDBSite objects, as well as their
 own attributes.
 
+This method returns a false value is the volume name is not present in
+the VLDB, and raises an exception for all other errors.
+
 NOTE: the VLDBEntry and VLDBSite objects are the same as those used by
 the 'examine' method, since that command also queries the VLDB for
 part of its return values.  See that discussion above for some
-relevant details on the parsing of those objects, which will no be
+relevant details on the parsing of those objects, which will not be
 repeated here.
 
     my $result = $vos->listvldb( cell => $cell );
