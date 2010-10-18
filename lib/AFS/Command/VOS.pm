@@ -661,6 +661,10 @@ sub listvol {
     my $self = shift;
     my %args = @_;
 
+    if ( exists $args{format} ) {
+        croak qq{Unsupported 'vos listvol' argument: -format\n};
+    }
+
     my $result = AFS::Object::VolServer->new;
 
     $self->operation( q{listvol} );

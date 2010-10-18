@@ -549,6 +549,15 @@ foreach my $objectpair ( [ $partinfo, $listpart ], [ $listpart, $partinfo ] ) {
 
 }
 
+throws_ok {
+    $vos->listvol(
+        server => $server_primary,
+        cell   => $cell,
+        format => 1,
+    );
+} qr{Unsupported 'vos listvol' argument: -format}ms,
+    q{vos->listvol raises exception when format is used};
+
 my $listvol = $vos->listvol(
    server => $server_primary,
    cell   => $cell,
