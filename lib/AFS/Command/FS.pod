@@ -55,7 +55,8 @@ attribute, and nothing else (no other data attributes, except the path
 itself).
 
 This holds true for the following API methods: diskfree, examine,
-listquota, quota, storebehind, whereis, whichcell, and listacl.
+getcalleraccess, listacl, listquota, quota, storebehind, whereis, and
+whichcell.
 
 All of these commands return an AFS::Object::CacheManager object,
 which contains one or more AFS::Object::Path objects, one for each
