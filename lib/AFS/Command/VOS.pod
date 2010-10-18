@@ -1187,6 +1187,53 @@ This object has three attributes:
 
 =back
 
+=head2 size
+
+=over
+
+=item Arguments
+
+The vos help string is:
+
+    vos size: obtain various sizes of the volume. 
+    Usage: vos size -id <volume name or ID>
+                    [-partition <partition name>] [-server <machine name>]
+                    [-dump] [-time <dump from time>] [-cell <cell name>]
+                    [-noauth] [-localauth] [-verbose] [-encrypt] [-noresolve] [-help]
+
+The corresponding method invocation looks like:
+
+    my $result = $vos->size(
+       # Required arguments
+       id => $id,
+       # Optional arguments
+       server    => $server,
+       partition => $partition,
+       time      => $time,
+       cell      => $cell,
+       dump      => 1,
+       noauth    => 1,
+       localauth => 1,
+       verbose   => 1,
+       encrypt   => 1,
+       noresolve => 1,
+    );
+
+NOTE: Because calling "vos size" without -dump is meaningless, the
+value of the dump option defaults to true.  IOW, you do not need to
+pass dump => 1 to the method.  
+
+=item Return Values
+
+This method returns a generic AFS::Object object with two attributes:
+
+    Attributes                          Values
+    ----------                          ------
+    volume                              Name of the volume
+    dump_size                           Size of the dump
+
+=back
+
 =head2 status
 
 =over

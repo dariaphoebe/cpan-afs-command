@@ -641,6 +641,19 @@ foreach my $header ( @headers ) {
 ok( ref $volume_header && $volume_header->isa( q{AFS::Object::VolumeHeader} ),
     q{found matching header} );
 
+ok( ! $vos->size( id => q{nosuchvolume}, cell => $cell ),
+    q{vos->size return false for no vldb entry} );
+
+throws_ok {
+    $vos->size( id => q{nosuchvolume}, cell => q{nosuchcell} );
+} qr{can.t find cell nosuchcell's hosts}ms,
+    q{vos->size raises exception for bogus cell name};
+
+$result = $vos->size( id => q{root.afs}, cell => $cell );
+ok( ref $result && $result->isa( q{AFS::Object} ), q{vos->size returns correct object} );
+ok( $result->volume eq q{root.afs}, q{vos->size->volume} );
+ok( $result->dump_size =~ m{^\d+$}ms, q{vos->size->dump_size} );
+
 done_testing();
 exit 0;
 

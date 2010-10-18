@@ -19,6 +19,49 @@ use AFS::Object::FileServer;
 use AFS::Object::Partition;
 use AFS::Object::Transaction;
 
+sub size {
+
+    my $self = shift;
+    my %args = @_;
+
+    $self->operation( q{size} );
+
+    my $result = AFS::Object->new;
+
+    # This is because without -dump, the command is meaningless
+    $args{dump} = 1;
+
+    $self->_parse_arguments(%args);
+    $self->_save_stderr;
+    $self->_exec_commands;
+
+    while ( defined($_ = $self->_handle->getline) ) {
+
+        chomp;
+
+        given ( $_ ) {
+            when ( m{Volume: (.*)}ms ) {
+                $result->_setAttribute( volume => $1 );
+            }
+            when ( m{dump_size: (\d+)}ms ) {
+                $result->_setAttribute( dump_size => $1 );
+            }
+        }
+
+    }
+
+    $self->_restore_stderr;
+
+    if ( $self->_errors =~ m{VLDB: no such entry}ms ) {
+        $self->_reap_commands( allowstatus => [ 1, 255 ] );
+        return;
+    } else {
+        $self->_reap_commands;
+        return $result;
+    }
+
+}
+
 sub examine {
 
     my $self = shift;
@@ -676,9 +719,9 @@ sub listvol {
             }
 
             #
-            # We have to _handle multiple formats here.  For
-            # now, just parse the "fast" and normal output.
-            # Extended is not yet supported.
+            # We have to handle multiple formats here.  For now, just
+            # parse the "fast" and normal output.  Extended is not yet
+            # supported.
             #
 
             my (@array) = split;
