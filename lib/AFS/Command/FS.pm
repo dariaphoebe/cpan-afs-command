@@ -25,6 +25,14 @@ sub examine {
     return shift->_paths_method( q{examine} ,@_ );
 }
 
+sub getcalleraccess {
+    return shift->_paths_method( q{getcalleraccess} ,@_ );
+}
+
+sub listacl {
+    return shift->_paths_method( q{listacl}, @_ );
+}
+
 sub listquota {
     return shift->_paths_method( q{listquota}, @_ );
 }
@@ -43,10 +51,6 @@ sub whereis {
 
 sub whichcell {
     return shift->_paths_method( q{whichcell}, @_ );
-}
-
-sub listacl {
-    return shift->_paths_method( q{listacl}, @_ );
 }
 
 sub _paths_method {
@@ -91,107 +95,6 @@ sub _paths_method {
             @paths = grep { $_ ne $1 } @paths;
             $result->_addPath($path);
             next;
-        }
-
-        if ( $operation eq q{listacl} ) {
-
-            if ( m{^Access list for (.*) is}ms ) {
-
-                $path->_setAttribute( path => $1 );
-                delete $paths{$1};
-
-                my %acls = (
-                    normal   => AFS::Object::ACL->new,
-                    negative => AFS::Object::ACL->new,
-                );
-
-                my $type = q{};
-
-                while ( defined($_ = $self->_handle->getline) ) {
-
-                    chomp;
-                    s{^\s+}{}gms;
-                    s{\s+$}{}gms;
-                    last if not $_;
-
-                    if ( m{^(Normal|Negative) rights:}ms ) {
-                        $type = lc($1);
-                    } else {
-                        my ($principal,$rights) = split;
-                        $acls{$type}->_addEntry( $principal => $rights );
-                    }
-
-                }
-
-                $path->_setACLNormal( $acls{normal} );
-                $path->_setACLNegative( $acls{negative} );
-
-            }
-
-        }
-
-        if ( $operation eq q{whichcell} ) {
-            if ( m{^File (\S+) lives in cell \'([^\']+)\'}ms ) {
-                $path->_setAttribute(
-                    path => $1,
-                    cell => $2,
-                );
-                delete $paths{$1};
-            }
-        }
-
-        if ( $operation eq q{whereis} ) {
-            if ( m{^File (.*) is on hosts? (.*)$}ms ) {
-                $path->_setAttribute(
-                    path  => $1,
-                    hosts => [split(/\s+/,$2)],
-                );
-                delete $paths{$1};
-            }
-        }
-
-        if ( $operation eq q{storebehind} ) {
-            if ( m{Will store (.*?) according to default.}ms ) {
-                $path->_setAttribute(
-                    path       => $1,
-                    asynchrony => q{default},
-                );
-                delete $paths{$1};
-            } elsif ( m{Will store up to (\d+) kbytes of (.*?) asynchronously}ms ) {
-                $path->_setAttribute(
-                    path       => $2,
-                    asynchrony => $1,
-                );
-                delete $paths{$2};
-            }
-        }
-
-        if ( $operation eq q{quota} ) {
-            if ( m{^\s*(\d{1,2})%}ms ) {
-                $path->_setAttribute(
-                    path    => $paths[0],
-                    percent => $1,
-                );
-                delete $paths{$paths[0]};
-                shift @paths;
-            }
-        }
-
-        if ( $operation eq q{listquota} ) {
-            s{no limit}{0}gms;
-            my ($volname,$quota,$used,$percent,$partition) = split;
-            $percent   =~ s{\D}{}gms;
-            $partition =~ s{\D}{}gms;
-            $path->_setAttribute(
-                path      => $paths[0],
-                volname   => $volname,
-                quota     => $quota,
-                used      => $used,
-                percent   => $percent,
-                partition => $partition,
-            );
-            delete $paths{$paths[0]};
-            shift @paths;
         }
 
         if ( $operation eq q{diskfree} ) {
@@ -252,6 +155,114 @@ sub _paths_method {
 
             }
 
+        }
+
+        if ( $operation eq q{getcalleraccess} ) {
+            if ( m{Callers access to (.*) is (\S+)}ms ) {
+                $path->_setAttribute( path => $1, rights => $2 );
+                delete $paths{$1};
+            }
+        }
+
+        if ( $operation eq q{listacl} ) {
+
+            if ( m{^Access list for (.*) is}ms ) {
+
+                $path->_setAttribute( path => $1 );
+                delete $paths{$1};
+
+                my %acls = (
+                    normal   => AFS::Object::ACL->new,
+                    negative => AFS::Object::ACL->new,
+                );
+
+                my $type = q{};
+
+                while ( defined($_ = $self->_handle->getline) ) {
+
+                    chomp;
+                    s{^\s+}{}gms;
+                    s{\s+$}{}gms;
+                    last if not $_;
+
+                    if ( m{^(Normal|Negative) rights:}ms ) {
+                        $type = lc($1);
+                    } else {
+                        my ($principal,$rights) = split;
+                        $acls{$type}->_addEntry( $principal => $rights );
+                    }
+
+                }
+
+                $path->_setACLNormal( $acls{normal} );
+                $path->_setACLNegative( $acls{negative} );
+
+            }
+
+        }
+
+        if ( $operation eq q{listquota} ) {
+            s{no limit}{0}gms;
+            my ($volname,$quota,$used,$percent,$partition) = split;
+            $percent   =~ s{\D}{}gms;
+            $partition =~ s{\D}{}gms;
+            $path->_setAttribute(
+                path      => $paths[0],
+                volname   => $volname,
+                quota     => $quota,
+                used      => $used,
+                percent   => $percent,
+                partition => $partition,
+            );
+            delete $paths{$paths[0]};
+            shift @paths;
+        }
+
+        if ( $operation eq q{quota} ) {
+            if ( m{^\s*(\d{1,2})%}ms ) {
+                $path->_setAttribute(
+                    path    => $paths[0],
+                    percent => $1,
+                );
+                delete $paths{$paths[0]};
+                shift @paths;
+            }
+        }
+
+        if ( $operation eq q{storebehind} ) {
+            if ( m{Will store (.*?) according to default.}ms ) {
+                $path->_setAttribute(
+                    path       => $1,
+                    asynchrony => q{default},
+                );
+                delete $paths{$1};
+            } elsif ( m{Will store up to (\d+) kbytes of (.*?) asynchronously}ms ) {
+                $path->_setAttribute(
+                    path       => $2,
+                    asynchrony => $1,
+                );
+                delete $paths{$2};
+            }
+        }
+
+        if ( $operation eq q{whereis} ) {
+            if ( m{^File (.*) is on hosts? (.*)$}ms ) {
+                $path->_setAttribute(
+                    path  => $1,
+                    hosts => [split(/\s+/,$2)],
+                );
+                delete $paths{$1};
+            }
+        }
+
+        if ( $operation eq q{whichcell} ) {
+            if ( m{^File (\S+) lives in cell \'([^\']+)\'}ms ) {
+                $path->_setAttribute(
+                    path => $1,
+                    cell => $2,
+                );
+                delete $paths{$1};
+            }
         }
 
         if ( not $path->path ) {

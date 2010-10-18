@@ -72,13 +72,14 @@ ok( $result->interval =~ m{^\d+$}ms, q{result->interval} );
 my $paths = [ $pathafs, $pathnotafs, $pathbogus ];
 
 my %pathops = (
-    diskfree    => [qw( volname total used avail percent )],
-    examine     => [qw( volname total avail id quota )],
-    listquota   => [qw( volname quota used percent partition )],
-    quota       => [qw( percent )],
-    storebehind => [qw( asynchrony )],
-    whereis     => [qw( hosts )],
-    whichcell   => [qw( cell )],
+    diskfree        => [qw( volname total used avail percent )],
+    examine         => [qw( volname total avail id quota )],
+    getcalleraccess => [qw( rights )],
+    listquota       => [qw( volname quota used percent partition )],
+    quota           => [qw( percent )],
+    storebehind     => [qw( asynchrony )],
+    whereis         => [qw( hosts )],
+    whichcell       => [qw( cell )],
 );
 
 foreach my $pathop ( keys %pathops ) {
