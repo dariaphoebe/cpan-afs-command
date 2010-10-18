@@ -61,6 +61,36 @@ itself).
 This holds true for the following API methods: diskfree, examine,
 listquota, quota, storebehind, whereis, whichcell, and listacl.
 
+=head2 bypassthreshold
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs bypassthreshold: get/set cache bypass file size threshold 
+    Usage: fs bypassthreshold [-size <file size>]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->bypassthreshold(
+        # Optional arguments
+        size => $size,
+    );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object with one attribute.
+
+    Attributes                  Values
+    ----------                  ------
+    bypassthreshold             The value of the cache bypass threshold    
+
+Note that a value of -1 means disabled.
+
+=back
+
 =head2 checkservers
 
 =over
@@ -1260,6 +1290,25 @@ The corresponding method invocation looks like:
        if      => 1,
     );
 
+=head2 discon
+
+The fs help string is:
+
+    fs discon: disconnection mode 
+    Usage: fs discon -mode <offline | online> [-policy <client | server>]
+                     [-force] [-uid <Numeric UID of user whose tokens to use at reconnect.>]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->discon(
+        # Required arguments
+        mode   => $mode,
+        # Optional arguments
+        policy => $policy,
+        force  => 1,
+        uid    => $uid,
+    );
+
 =head2 flush
 
 The fs help string is:
@@ -1368,6 +1417,20 @@ The corresponding method invocation looks like:
        servers    => $server, # OR [ $server1, $server2, ... ]
        # Optional arguments
        linkedcell => $linkedcell,
+    );
+
+=head2 nukenfscreds
+
+The fs help string is:
+
+    fs nukenfscreds: nuke credentials for NFS client 
+    Usage: fs nukenfscreds -addr <host name or address>
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->nukenfscreds(
+       # Required arguments
+       addr => $addr,
     );
 
 =head2 rmmount

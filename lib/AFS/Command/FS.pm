@@ -17,48 +17,6 @@ use AFS::Object::Cell;
 use AFS::Object::Server;
 use AFS::Object::ACL;
 
-sub checkservers {
-
-    my $self = shift;
-    my %args = @_;
-
-    my $result = AFS::Object::CacheManager->new;
-
-    $self->operation( q{checkservers} );
-
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
-
-    my @servers = ();
-
-    while ( defined($_ = $self->_handle->getline) ) {
-
-        chomp;
-
-        if ( m{The current down server probe interval is (\d+) secs}ms ) {
-            $result->_setAttribute( interval => $1 );
-        }
-
-        if ( m{These servers are still down:}ms ) {
-            while ( defined($_ = $self->_handle->getline) ) {
-                chomp;
-                s{^\s+}{}gms;
-                s{\s+$}{}gms;
-                push @servers, $_;
-            }
-        }
-    }
-
-    $result->_setAttribute( servers => \@servers );
-
-    $self->_restore_stderr;
-    $self->_reap_commands;
-
-    return $result;
-
-}
-
 sub diskfree {
     return shift->_paths_method( q{diskfree}, @_ );
 }
@@ -367,6 +325,75 @@ sub _default_asynchrony {
     }
 
     return $default_asynchrony;
+
+}
+
+sub bypassthreshold {
+
+    my $self = shift;
+    my %args = @_;
+
+    my $result = AFS::Object::CacheManager->new;
+
+    $self->operation( q{bypassthreshold} );
+
+    $self->_parse_arguments(%args);
+    $self->_save_stderr;
+    $self->_exec_commands;
+
+    while ( defined($_ = $self->_handle->getline) ) {
+        chomp;
+        if ( m{Cache bypass threshold (\S+)}ms ) {
+            $result->_setAttribute( bypassthreshold => $1 );
+        }
+    }
+
+    $self->_restore_stderr;
+    $self->_reap_commands;
+
+    return $result;
+
+}
+
+sub checkservers {
+
+    my $self = shift;
+    my %args = @_;
+
+    my $result = AFS::Object::CacheManager->new;
+
+    $self->operation( q{checkservers} );
+
+    $self->_parse_arguments(%args);
+    $self->_save_stderr;
+    $self->_exec_commands;
+
+    my @servers = ();
+
+    while ( defined($_ = $self->_handle->getline) ) {
+
+        chomp;
+
+        if ( m{The current down server probe interval is (\d+) secs}ms ) {
+            $result->_setAttribute( interval => $1 );
+        }
+
+        if ( m{These servers are still down:}ms ) {
+            while ( defined($_ = $self->_handle->getline) ) {
+                chomp;
+                s{^\s+}{}gms;
+                s{\s+$}{}gms;
+                push @servers, $_;
+            }
+        }
+    }
+
+    $result->_setAttribute( servers => \@servers );
+
+    $self->_restore_stderr;
+    $self->_reap_commands;
+
+    return $result;
 
 }
 

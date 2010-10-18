@@ -378,6 +378,8 @@ This method returns a generic AFS::Object with the following attributes:
 If the -dryrun argument is given, then the total and failed counts
 will both be zero, since no actual backups will be performed.
 
+=back
+
 =head2 examine
 
 =over
