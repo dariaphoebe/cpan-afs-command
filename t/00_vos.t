@@ -549,6 +549,13 @@ foreach my $objectpair ( [ $partinfo, $listpart ], [ $listpart, $partinfo ] ) {
 
 }
 
+if ( $vos->supportsArgument( q{partinfo}, q{summary} ) ) {
+    foreach my $attr ( qw( available total partitions ) ) {
+        ok( $partinfo->$attr =~ m{^\d+$}ms,
+            qq{partinfo->$attr returned when partinfo supports summary} );
+    }
+}
+
 throws_ok {
     $vos->listvol(
         server => $server_primary,

@@ -1139,6 +1139,9 @@ The vos help string is:
     Usage: vos partinfo -server <machine name> [-partition <partition name>]
                         [-cell <cell name>] [-noauth] [-localauth]
                         [-verbose] [-encrypt]
+    Usage: vos partinfo -server <machine name> [-partition <partition name>]
+                        [-summary] [-cell <cell name>] [-noauth] [-localauth]
+                        [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1147,12 +1150,18 @@ The corresponding method invocation looks like:
        server    => $server,
        # Optional arguments
        partition => $partition,
+       summary   => 1,
        cell      => $cell,
        noauth    => 1,
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
+
+NOTE: if supported, the -summary argument is passed by default, so it
+never needs to be specified at all.  If your vos binary support
+-summary, then you will get the summary information for free.
 
 =item Return Values
 
@@ -1165,6 +1174,15 @@ interesting attributes than those returned by 'vos partinfo'.
        cell   => $cell,
     );
 
+    if ( $vos->supportsArgument( q{partinfo}, q{summary} ) {
+        my $partitions = $result->partitions;
+        my $available  = $result->available;
+        my $total      = $result->total;
+        print( qq{Server $server has $available KB of } .
+               qq{space available out of $total KB total } .
+               qq{on $partitions partitions\n} );
+    }
+
     foreach my $partition ( $result->getPartitions ) {
         my $partname  = $partition->partition;
         my $available = $partition->available;
@@ -1175,9 +1193,19 @@ interesting attributes than those returned by 'vos partinfo'.
 
 B<AFS::Object::FileServer>
 
-This object has no attributes, and is merely a container for the
-AFS::Object::Partition objects.  It has the following methods
-for extracting the objects is contains.
+This object has no attributes, unless the API is used with a vos
+binary that supports the -summary option.  If -summary is supported,
+then this object has 3 attributes:
+
+    Attributes                  Values
+    ----------                  ------
+    partitions                  Number of partitions counted in the summary
+    available                   Space available, in KB
+    total                       Total space, in KB
+
+This object is primarily a container for the AFS::Object::Partition
+objects.  It has the following methods for extracting the objects is
+contains.
 
     Methods                     Returns
     -------                     -------

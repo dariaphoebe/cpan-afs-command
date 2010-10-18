@@ -844,18 +844,33 @@ sub partinfo {
 
     $self->operation( q{partinfo} );
 
+    if ( $self->supportsArgument( q{partinfo}, q{summary} ) ) {
+        $args{summary} = 1;
+    }
+
     $self->_parse_arguments(%args);
     $self->_save_stderr;
     $self->_exec_commands;
 
     while ( defined($_ = $self->_handle->getline) ) {
-        next if not m{partition (/vice\w+): (-?\d+)\D+(\d+)$}ms;
-        my $partition = AFS::Object::Partition->new(
-            partition => $1,
-            available => $2,
-            total     => $3,
-        );
-        $result->_addPartition($partition);
+
+        if ( m{partition (/vice\w+): (-?\d+)\D+(\d+)$}ms ) {
+            my $partition = AFS::Object::Partition->new(
+                partition => $1,
+                available => $2,
+                total     => $3,
+            );
+            $result->_addPartition($partition);
+        }
+
+        if ( m{Summary: (\d+) KB free out of (\d+) KB on (\d+) partitions}ms ) {
+            $result->_setAttribute(
+                available  => $1,
+                total      => $2,
+                partitions => $3,
+            );
+        }
+        
     }
 
     $self->_restore_stderr;
