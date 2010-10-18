@@ -1451,10 +1451,7 @@ The vos help string is:
 
     vos backup: make backup of a volume
     Usage: vos backup -id <volume name or ID> [-cell <cell name>]
-                      [-noauth] [-localauth] [-verbose] [-encrypt]
-    Usage: vos backup -id <volume name or ID> [-cell <cell name>]
                       [-noauth] [-localauth] [-verbose] [-encrypt] [-noresolve]
-
 
 The corresponding method invocation looks like:
 
@@ -1477,8 +1474,7 @@ The vos help string is:
     vos changeaddr: change the IP address of a file server
     Usage: vos changeaddr -oldaddr <original IP address> [-newaddr <new IP address>]
                           [-remove] [-cell <cell name>] [-noauth]
-                          [-localauth] [-verbose] [-encrypt]
-    Where: -remove     remove the IP address from the VLDB
+                          [-localauth] [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1493,6 +1489,7 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 changeloc
@@ -1503,7 +1500,7 @@ The vos help string is:
     Usage: vos changeloc -server <machine name for new location>
                          -partition <partition name for new location>
                          -id <volume name or ID> [-cell <cell name>] [-noauth]
-                         [-localauth] [-verbose] [-encrypt]
+                         [-localauth] [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1518,6 +1515,7 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 clone
@@ -1525,11 +1523,10 @@ The corresponding method invocation looks like:
 The vos help string is:
 
     vos clone: make clone of a volume
-    Usage: vos clone -id <volume name or ID> 
-      [-server <server>] [-partition <partition>] 
-      [-toname <volume name on destination>] [-toid <volume ID on destination>] 
-      [-offline] [-readonly] [-cell <cell name>] [-noauth] 
-      [-localauth] [-verbose] [-encrypt]
+    Usage: vos clone -id <volume name or ID> [-server <server>] [-partition <partition>]
+                     [-toname <volume name on destination>] [-toid <volume ID on destination>]
+                     [-offline] [-readonly] [-cell <cell name>] [-noauth]
+                     [-localauth] [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1546,6 +1543,7 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 convertROtoRW
@@ -1553,9 +1551,9 @@ The corresponding method invocation looks like:
 The vos help string is:
 
     vos convertROtoRW: convert a RO volume into a RW volume (after loss of old RW volume)
-    Usage: vos convertROtoRW -server <machine name> -partition <partition name> 
-       -id <volume name or ID> [-force] [-cell <cell name>] [-noauth]
-       [-localauth] [-verbose] [-encrypt]
+    Usage: vos convertROtoRW -server <machine name> -partition <partition name>
+                             -id <volume name or ID> [-force] [-cell <cell name>]
+                             [-noauth] [-localauth] [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1570,6 +1568,7 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 copy
@@ -1577,11 +1576,11 @@ The corresponding method invocation looks like:
 The vos help string is:
 
     vos copy: copy a volume
-    Usage: vos copy -id <volume name or ID on source> -fromserver <machine name on source> 
-       -frompartition <partition name on source> -toname <volume name on destination> 
-       -toserver <machine name on destination> -topartition <partition name on destination> 
-       [-offline] [-readonly] [-live] [-cell <cell name>] [-noauth] 
-       [-localauth] [-verbose] [-encrypt]
+    Usage: vos copy -id <volume name or ID on source> -fromserver <machine name on source>
+                    -frompartition <partition name on source> -toname <volume name on destination>
+                    -toserver <machine name on destination> -topartition <partition name on destination>
+                    [-offline] [-readonly] [-live] [-cell <cell name>] [-noauth]
+                    [-localauth] [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1599,6 +1598,7 @@ The corresponding method invocation looks like:
        localauth     => 1,
        verbose       => 1,
        encrypt       => 1,
+       noresolve     => 1,
      );
 
 =head2 create
@@ -1608,7 +1608,9 @@ The vos help string is:
     vos create: create a new volume
     Usage: vos create -server <machine name> -partition <partition name>
                       -name <volume name> [-maxquota <initial quota (KB)>]
-                      [-cell <cell name>] [-noauth] [-localauth] [-verbose] [-encrypt]
+                      [-id <volume ID>] [-roid <readonly volume ID>]
+                      [-cell <cell name>] [-noauth] [-localauth] [-verbose]
+                      [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1618,12 +1620,15 @@ The corresponding method invocation looks like:
        partition => $partition,
        name      => $name,
        # Optional arguments
+       id        => $id,
+       roid      => $roid,
        maxquota  => $maxquota,
        cell      => $cell,
        noauth    => 1,
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 delentry
@@ -1634,7 +1639,8 @@ The vos help string is:
     Usage: vos delentry [-id <volume name or ID>+]
                         [-prefix <prefix of the volume whose VLDB entry is to be deleted>]
                         [-server <machine name>] [-partition <partition name>]
-                        [-cell <cell name>] [-noauth] [-localauth] [-verbose] [-encrypt]
+                        [-noexecute] [-cell <cell name>] [-noauth] [-localauth]
+                        [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1644,11 +1650,37 @@ The corresponding method invocation looks like:
        prefix    => $prefix,
        server    => $server,
        partition => $partition,
+       noexecute => 1,
        cell      => $cell,
        noauth    => 1,
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
+    );
+
+=head2 endtrans
+
+The vos help string is:
+
+    vos endtrans: end a volserver transaction 
+    Usage: vos endtrans -server <machine name> -transaction <transaction ID>
+                        [-cell <cell name>] [-noauth] [-localauth]
+                        [-verbose] [-encrypt] [-noresolve]
+
+The corresponding method invocation looks like:
+
+    my $result = $vos->endtrans(
+       # Required arguments
+       server      => $server,
+       transaction => $transaction,
+       # Optional arguments
+       cell        => $cell,
+       noauth      => 1,
+       localauth   => 1,
+       verbose     => 1,
+       encrypt     => 1,
+       noresolve   => 1,
     );
 
 =head2 lock
@@ -1657,7 +1689,7 @@ The vos help string is:
 
     vos lock: lock VLDB entry for a volume
     Usage: vos lock -id <volume name or ID> [-cell <cell name>]
-                    [-noauth] [-localauth] [-verbose] [-encrypt]
+                    [-noauth] [-localauth] [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1670,6 +1702,7 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 move
@@ -1680,8 +1713,9 @@ The vos help string is:
     Usage: vos move -id <volume name or ID> -fromserver <machine name on source>
                     -frompartition <partition name on source>
                     -toserver <machine name on destination>
-                    -topartition <partition name on destination> [-cell <cell name>]
-                    [-noauth] [-localauth] [-verbose] [-encrypt]
+                    -topartition <partition name on destination>
+                     [-live] [-cell <cell name>] [-noauth] [-localauth]
+                     [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1693,21 +1727,24 @@ The corresponding method invocation looks like:
        toserver      => $toserver,
        topartition   => $topartition,
        # Optional arguments
+       live          => 1,
        cell          => $cell,
        noauth        => 1,
        localauth     => 1,
        verbose       => 1,
        encrypt       => 1,
+       noresolve     => 1,
     );
 
 =head2 offline
 
 The vos help string is:
 
+    vos offline: force the volume status to offline 
     Usage: vos offline -server <server name> -partition <partition name>
                        -id <volume name or ID> [-sleep <seconds to sleep>]
-                       [-busy] [-cell <cell name>]
-                       [-noauth] [-localauth] [-verbose] [-encrypt]
+                       [-busy] [-cell <cell name>] [-noauth] [-localauth]
+                       [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1724,15 +1761,17 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 online
 
 The vos help string is:
 
+    vos online: force the volume status to online 
     Usage: vos online -server <server name> -partition <partition name>
                       -id <volume name or ID> [-cell <cell name>]
-                      [-noauth] [-localauth] [-verbose] [-encrypt]
+                      [-noauth] [-localauth] [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1747,6 +1786,7 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 release
@@ -1755,8 +1795,7 @@ The vos help string is:
 
     vos release: release a volume
     Usage: vos release -id <volume name or ID> [-force] [-cell <cell name>]
-                       [-noauth] [-localauth] [-verbose] [-encrypt]
-    Where: -force      force a complete release
+                       [-noauth] [-localauth] [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1770,6 +1809,7 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 remove
@@ -1779,7 +1819,7 @@ The vos help string is:
     vos remove: delete a volume
     Usage: vos remove [-server <machine name>] [-partition <partition name>]
                       -id <volume name or ID> [-cell <cell name>] [-noauth]
-                      [-localauth] [-verbose] [-encrypt]
+                      [-localauth] [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1794,6 +1834,7 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 remsite
@@ -1803,7 +1844,7 @@ The vos help string is:
     vos remsite: remove a replication site
     Usage: vos remsite -server <machine name> -partition <partition name>
                        -id <volume name or ID> [-cell <cell name>] [-noauth]
-                       [-localauth] [-verbose] [-encrypt]
+                       [-localauth] [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1818,6 +1859,7 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 rename
@@ -1825,8 +1867,9 @@ The corresponding method invocation looks like:
 The vos help string is:
 
     vos rename: rename a volume
-    Usage: vos rename -oldname <old volume name > -newname <new volume name >
-                      [-cell <cell name>] [-noauth] [-localauth] [-verbose] [-encrypt]
+    Usage: vos rename -oldname <old volume name> -newname <new volume name>
+                      [-cell <cell name>] [-noauth] [-localauth] [-verbose]
+                      [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1840,6 +1883,31 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
+    );
+
+=head2 setaddrs
+
+The vos help string is:
+
+    vos setaddrs: set the list of IP address for a given UUID in the VLDB 
+    Usage: vos setaddrs -uuid <uuid of server> -host <address of host>+
+                        [-cell <cell name>] [-noauth] [-localauth]
+                        [-verbose] [-encrypt] [-noresolve]
+
+The corresponding method invocation looks like:
+
+    my $result = $vos->rename(
+       # Required arguments
+       uuid      => $uuid,
+       host      => $host, # or [ $host1, $host2, ... ]
+       # Optional arguments
+       cell      => $cell,
+       noauth    => 1,
+       localauth => 1,
+       verbose   => 1,
+       encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 setfields
@@ -1848,23 +1916,25 @@ The vos help string is:
 
     vos setfields: change volume info fields
     Usage: vos setfields -id <volume name or ID> [-maxquota <quota (KB)>]
-                         [-clearuse] [-cell <cell name>] [-noauth]
-                         [-localauth] [-verbose] [-encrypt]
-    Where: -clearuse   clear dayUse
+                         [-clearuse] [-clearVolUpCounter] [-cell <cell name>]
+                         [-noauth] [-localauth] [-verbose]
+                         [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
     my $result = $vos->setfields(
        # Required arguments
-       id        => $id,
+       id                => $id,
        # Optional arguments
-       maxquota  => $maxquota,
-       clearuse  => 1,
-       cell      => $cell,
-       noauth    => 1,
-       localauth => 1,
-       verbose   => 1,
-       encrypt   => 1,
+       maxquota          => $maxquota,
+       clearuse          => 1,
+       clearVolUpCounter => 1,
+       cell              => $cell,
+       noauth            => 1,
+       localauth         => 1,
+       verbose           => 1,
+       encrypt           => 1,
+       noresolve         => 1,
     );
 
 =head2 shadow
@@ -1872,11 +1942,15 @@ The corresponding method invocation looks like:
 The vos help string is:
 
     vos shadow: make or update a shadow volume
-    Usage: vos shadow -id <volume name or ID on source> -fromserver <machine name on source> 
-       -frompartition <partition name on source> -toserver <machine name on destination> 
-       -topartition <partition name on destination> [-toname <volume name on destination>] 
-       [-toid <volume ID on destination>] [-offline] [-readonly] [-live] [-incremental] 
-       [-cell <cell name>] [-noauth] [-localauth] [-verbose] [-encrypt]
+    Usage: vos shadow -id <volume name or ID on source>
+                      -fromserver <machine name on source>
+                      -frompartition <partition name on source>
+                      -toserver <machine name on destination>
+                      -topartition <partition name on destination>
+                      [-toname <volume name on destination>]
+                      [-toid <volume ID on destination>] [-offline] [-readonly]
+                      [-live] [-incremental] [-cell <cell name>] [-noauth]
+                      [-localauth] [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1890,11 +1964,16 @@ The corresponding method invocation looks like:
        # Optional arguments
        toname        => $newname
        toid          => $newid
+       offline       => 1,
+       readonly      => 1,
+       live          => 1,
+       incremental   => 1,
        cell          => $cell,
        noauth        => 1,
        localauth     => 1,
        verbose       => 1,
        encrypt       => 1,
+       noresolve     => 1,
     );
 
 =head2 syncserv
@@ -1903,7 +1982,8 @@ The vos help string is:
 
     vos syncserv: synchronize server with VLDB
     Usage: vos syncserv -server <machine name> [-partition <partition name>]
-                        [-cell <cell name>] [-noauth] [-localauth] [-verbose] [-encrypt]
+                        [-dryrun] [-cell <cell name>] [-noauth] [-localauth]
+                        [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1917,7 +1997,13 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
+
+NOTE: Since this operation returns no data, use of the -dryrun option,
+while "supported", is meaningless.  This method will need to be
+converted to one which returns objects encapsulating that data before
+-dryrun can be used to query what would happen.
 
 =head2 syncvldb
 
@@ -1925,8 +2011,9 @@ The vos help string is:
 
     vos syncvldb: synchronize VLDB with server
     Usage: vos syncvldb [-server <machine name>] [-partition <partition name>]
-                        [-volume <volume name or ID>] [-cell <cell name>]
-                        [-noauth] [-localauth] [-verbose] [-encrypt]
+                        [-volume <volume name or ID>] [-dryrun]
+                        [-cell <cell name>] [-noauth] [-localauth]
+                        [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1940,7 +2027,13 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
+
+NOTE: Since this operation returns no data, use of the -dryrun option,
+while "supported", is meaningless.  This method will need to be
+converted to one which returns objects encapsulating that data before
+-dryrun can be used to query what would happen.
 
 =head2 unlock
 
@@ -1961,6 +2054,7 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 unlockvldb
@@ -1969,7 +2063,8 @@ The vos help string is:
 
     vos unlockvldb: unlock all the locked entries in the VLDB
     Usage: vos unlockvldb [-server <machine name>] [-partition <partition name>]
-                          [-cell <cell name>] [-noauth] [-localauth] [-verbose] [-encrypt]
+                          [-cell <cell name>] [-noauth] [-localauth]
+                          [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -1982,6 +2077,7 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head2 zap
@@ -1991,9 +2087,7 @@ The vos help string is:
     vos zap: delete the volume, don't bother with VLDB
     Usage: vos zap -server <machine name> -partition <partition name> -id <volume ID>
                    [-force] [-backup] [-cell <cell name>] [-noauth]
-                   [-localauth] [-verbose] [-encrypt]
-    Where: -force      force deletion of bad volumes
-           -backup     also delete backup volume if one is found
+                   [-localauth] [-verbose] [-encrypt] [-noresolve]
 
 The corresponding method invocation looks like:
 
@@ -2010,6 +2104,7 @@ The corresponding method invocation looks like:
        localauth => 1,
        verbose   => 1,
        encrypt   => 1,
+       noresolve => 1,
     );
 
 =head1 SEE ALSO
