@@ -67,6 +67,10 @@ sub examine {
     my $self = shift;
     my %args = @_;
 
+    if ( exists $args{format} ) {
+        croak qq{Unsupported 'vos examine' argument: -format\n};
+    }
+
     my $result = AFS::Object::Volume->new;
     my $entry  = AFS::Object::VLDBEntry->new( locked => 0 );
 

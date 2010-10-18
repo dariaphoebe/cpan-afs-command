@@ -77,6 +77,11 @@ ok(
     q{vos->create},
 );
 
+throws_ok {
+    $vos->examine( id => $volname, cell => $cell, format => 1 );
+} qr{Unsupported 'vos examine' argument: -format}ms,
+    q{vos->examine raises exception when format is used};
+
 ok( ! $vos->examine( id => q{nosuchvolume}, cell => $cell ),
     q{vos->examine returns false for no vldb entry} );
 
