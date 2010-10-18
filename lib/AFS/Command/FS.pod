@@ -270,6 +270,29 @@ This method returns an AFS::Object::CacheManager object, which is documented abo
         }
     }
 
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    error                       The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    fid                         The FID for that path (eg. x.y)
+    volume                      The volume ID for that path
+
+NOTE: The errors returned will almost always be "Unable to determine
+results".  As of OpenAFS 1.5.77, the getfid command returns no errors
+at all when it can not determine the FID, and the exit code is always
+zero.
+
 =back
 
 =head2 listacl
