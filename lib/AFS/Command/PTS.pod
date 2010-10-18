@@ -360,7 +360,8 @@ B<AFS::Object::User>, B<AFS::Object::Group>
 The pts help string is:
 
     pts listmax: list max id
-    Usage: pts listmax [-cell <cell name>] [-noauth] [-force] [-localauth] [-auth] [-encrypt]
+    Usage: pts listmax [-cell <cell name>] [-noauth] [-force]
+                       [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
@@ -583,20 +584,21 @@ The pts help string is:
     pts adduser: add a user to a group
     Usage: pts adduser -user <user name>+ -group <group name>+
                        [-cell <cell name>] [-noauth] [-force]
-                       [-auth] [-encrypt]
+                       [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->adduser(
        # Required arguments
-       user    => $user,  # OR [ $user1, $user2, ... ]
-       group   => $group, # OR [ $group1, $group2, ... ]
+       user      => $user,  # OR [ $user1, $user2, ... ]
+       group     => $group, # OR [ $group1, $group2, ... ]
        # Optional arguments
-       cell    => $cell,
-       noauth  => 1,
-       force   => 1,
-       auth    => 1,
-       encrypt => 1,
+       cell      => $cell,
+       noauth    => 1,
+       force     => 1,
+       localauth => 1,
+       auth      => 1,
+       encrypt   => 1,
     );
 
 =head2 chown
@@ -606,20 +608,21 @@ The pts help string is:
     pts chown: change ownership of a group
     Usage: pts chown -name <group name> -owner <new owner>
                      [-cell <cell name>] [-noauth] [-force]
-                     [-auth] [-encrypt]
+                     [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->chown(
        # Required arguments
-       name    => $name,
-       owner   => $owner,
+       name      => $name,
+       owner     => $owner,
        # Optional arguments
-       cell    => $cell,
-       noauth  => 1,
-       force   => 1,
-       auth    => 1,
-       encrypt => 1,
+       cell      => $cell,
+       noauth    => 1,
+       force     => 1,
+       localauth => 1,
+       auth      => 1,
+       encrypt   => 1,
     );
 
 =head2 delete
@@ -629,19 +632,20 @@ The pts help string is:
     pts delete: delete a user or group from database
     Usage: pts delete -nameorid <user or group name or id>+
                       [-cell <cell name>] [-noauth] [-force]
-                      [-auth] [-encrypt]
+                      [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->delete(
        # Required arguments
-       nameorid => $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
+       nameorid  => $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
        # Optional arguments
-       cell     => $cell,
-       noauth   => 1,
-       force    => 1,
-       auth     => 1,
-       encrypt  => 1,
+       cell      => $cell,
+       noauth    => 1,
+       force     => 1,
+       localauth => 1,
+       auth      => 1,
+       encrypt   => 1,
     );
 
 =head2 removeuser
@@ -651,20 +655,21 @@ The pts help string is:
     pts removeuser: remove a user from a group
     Usage: pts removeuser -user <user name>+ -group <group name>+
                           [-cell <cell name>] [-noauth] [-force]
-                          [-auth] [-encrypt]
+                          [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->removeuser(
        # Required arguments
-       user    => $user, # OR [ $user1, $user2, ... ]
-       group   => $group, # OR [ $group1, $group2, ... ]
+       user      => $user, # OR [ $user1, $user2, ... ]
+       group     => $group, # OR [ $group1, $group2, ... ]
        # Optional arguments
-       cell    => $cell,
-       noauth  => 1,
-       force   => 1,
-       auth    => 1,
-       encrypt => 1,
+       cell      => $cell,
+       noauth    => 1,
+       force     => 1,
+       localauth => 1,
+       auth      => 1,
+       encrypt   => 1,
     );
 
 =head2 rename
@@ -674,20 +679,21 @@ The pts help string is:
     pts rename: rename user or group
     Usage: pts rename -oldname <old name> -newname <new name>
                       [-cell <cell name>] [-noauth] [-force]
-                      [-auth] [-encrypt]
+                      [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->rename(
        # Required arguments
-       oldname => $oldname,
-       newname => $newname,
+       oldname   => $oldname,
+       newname   => $newname,
        # Optional arguments
-       cell    => $cell,
-       noauth  => 1,
-       force   => 1,
-       auth    => 1,
-       encrypt => 1,
+       cell      => $cell,
+       noauth    => 1,
+       force     => 1,
+       localauth => 1,
+       auth      => 1,
+       encrypt   => 1,
     );
 
 =head2 setfields
@@ -698,7 +704,7 @@ pts setfields: set fields for an entry
 Usage: pts setfields -nameorid <user or group name or id>+ [-access <set privacy flags>]
                      [-groupquota <set limit on group creation>]
                      [-cell <cell name>] [-noauth] [-force]
-                     [-auth] [-encrypt]
+                     [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
@@ -711,6 +717,7 @@ The corresponding method invocation looks like:
        cell       => $cell,
        noauth     => 1,
        force      => 1,
+       localauth  => 1,
        auth       => 1,
        encrypt    => 1,
     );
@@ -722,19 +729,20 @@ The pts help string is:
     pts setmax: set max id
     Usage: pts setmax [-group <group max>] [-user <user max>]
                       [-cell <cell name>] [-noauth] [-force]
-                      [-auth] [-encrypt]
+                      [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->setmax(
        # Optional arguments
-       user    => $user,
-       group   => $group,
-       cell    => $cell,
-       noauth  => 1,
-       force   => 1,
-       auth    => 1,
-       encrypt => 1,
+       user      => $user,
+       group     => $group,
+       cell      => $cell,
+       noauth    => 1,
+       force     => 1,
+       localauth => 1,
+       auth      => 1,
+       encrypt   => 1,
     );
 
 =head1 SEE ALSO
