@@ -134,6 +134,32 @@ sub getrestart {
 
 }
 
+sub getrestricted {
+
+    my $self = shift;
+    my %args = @_;
+
+    my $result = AFS::Object::BosServer->new;
+
+    $self->operation( q{getrestricted} );
+
+    $self->_parse_arguments(%args);
+    $self->_save_stderr;
+    $self->_exec_commands;
+
+    while ( defined($_ = $self->_handle->getline) ) {
+        if ( m{Restricted mode is (\S+)}ms ) {
+            $result->_setAttribute( restricted => $1 );
+        }
+    }
+
+    $self->_restore_stderr;
+    $self->_reap_commands;
+
+    return $result;
+
+}
+
 sub listhosts {
 
     my $self = shift;

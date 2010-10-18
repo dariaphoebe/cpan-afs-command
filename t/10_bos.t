@@ -82,6 +82,14 @@ ok( ref $result && $result->isa( q{AFS::Object::BosServer} ), q{bos->getrestart}
 ok( $result->restart,  q{result->restart} );
 ok( $result->binaries, q{result->binaries} );
 
+$result = $bos->getrestricted(
+    server => $dbserver,
+    cell   => $cell,
+);
+ok( ref $result && $result->isa( q{AFS::Object::BosServer} ), q{bos->getrestricted} );
+
+ok( $result->restricted eq q{off}, q{result->restricted} );
+
 $result = $bos->listhosts(
    server => $dbserver,
    cell   => $cell,

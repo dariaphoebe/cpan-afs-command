@@ -240,6 +240,56 @@ B<AFS::Object::BosServer>
 
 =back
 
+=head2 getrestricted
+
+=over
+
+=item Arguments
+
+The bos help string is:
+
+    bos getrestricted: get restrict mode 
+    Usage: bos getrestricted -server <machine name> [-cell <cell name>]
+                             [-noauth] [-localauth]
+
+The corresponding method invocation looks like:
+
+    my $result = $bos->getrestricted(
+       # Required arguments
+       server    => $server,
+       # Optional arguments
+       cell      => $cell,
+       noauth    => 1,
+       localauth => 1,
+    );
+
+=item Return Values
+
+This method returns an AFS::Object::BosServer object, which
+contains one attribute.
+
+    my $result = $bos->getrestricted(
+       server => $server,
+       cell   => $cell,
+    );
+
+    my $restricted = $result->restricted;
+    if ( $restricted ) {
+        print qq{Server $server in cell $cell has restricted mode on\n};
+    } else {
+        print qq{Server $server in cell $cell has restricted mode off\n};
+    }
+
+The object has the following attributes:
+
+B<AFS::Object::BosServer>
+
+    Attributes                  Values
+    ----------                  ------
+    restricted                  on | off
+
+=back
+
 =head2 listhosts
 
 =over
@@ -574,7 +624,6 @@ The bos help string is:
     bos addhost: add host to cell dbase
     Usage: bos addhost -server <machine name> -host <host name>+
                        [-clone] [-cell <cell name>] [-noauth] [-localauth]
-    Where: -clone      vote doesn't count
 
 The corresponding method invocation looks like:
 
@@ -741,10 +790,6 @@ The bos help string is:
     bos prune: prune server files
     Usage: bos prune -server <machine name> [-bak] [-old] [-core] [-all]
                      [-cell <cell name>] [-noauth] [-localauth]
-    Where: -bak        delete .BAK files
-           -old        delete .OLD files
-           -core       delete core files
-           -all        delete all junk files
 
 The corresponding method invocation looks like:
 
@@ -828,8 +873,6 @@ The bos help string is:
     bos restart: restart processes
     Usage: bos restart -server <machine name> [-instance <instances>+] [-bosserver]
                        [-all] [-cell <cell name>] [-noauth] [-localauth]
-    Where: -bosserver  restart bosserver
-           -all        restart all processes
 
 The corresponding method invocation looks like:
 
@@ -855,7 +898,7 @@ The bos help string is:
                        [-file <salvage log output file>] [-all] [-showlog]
                        [-parallel <# of max parallel partition salvaging>]
                        [-tmpdir <directory to place tmp files>]
-                       [-orphans <ignore | remove | attach>] [-debug] [-nowrite]
+                       [-orphans <ignore | remove | attach>] [-forceDAFS] [-debug] [-nowrite]
                        [-force] [-oktozap] [-rootfiles] [-salvagedirs] [-blockreads]
                        [-ListResidencies] [-SalvageRemote] [-SalvageArchival]
                        [-IgnoreCheck] [-ForceOnLine] [-UseRootDirACL]
@@ -863,6 +906,7 @@ The bos help string is:
                        [-rxdebug] [-cell <cell name>] [-noauth] [-localauth]
     Where: -all                 salvage whole server
            -showlog             display salvage log
+           -forceDAFS           (DAFS) force salvage of demand attach fileserver
            -debug               (MR-AFS) Run in Debugging mode
            -nowrite             (MR-AFS) Run readonly/test mode
            -force               (MR-AFS) Force full salvaging
@@ -895,6 +939,7 @@ The corresponding method invocation looks like:
        parallel           => $parallel,
        tmpdir             => $tmpdir,
        orphans            => $orphans,
+       forceDAFS          => 1,
        debug              => 1,
        nowrite            => 1,
        force              => 1,
@@ -966,8 +1011,6 @@ The bos help string is:
     Usage: bos setrestart -server <machine name> -time <time to restart server>
                           [-general] [-newbinary] [-cell <cell name>]
                           [-noauth] [-localauth]
-    Where: -general    set general restart time
-           -newbinary  set new binary restart time
 
 The corresponding method invocation looks like:
 
@@ -983,6 +1026,26 @@ The corresponding method invocation looks like:
        localauth => 1,
     );
 
+=head2 setrestricted
+
+The bos help string is:
+
+    bos setrestricted: set restrict mode 
+    Usage: bos setrestricted -server <machine name> -mode <mode to set>
+                             [-cell <cell name>] [-noauth] [-localauth]
+
+The corresponding method invocation looks like:
+
+    my $result = $bos->setrestricted(
+       # Required arguments
+       server    => $server,
+       mode      => $mode,
+       # Optional arguments
+       cell      => $cell,
+       noauth    => 1,
+       localauth => 1,
+    );
+
 =head2 shutdown
 
 The bos help string is:
@@ -990,7 +1053,6 @@ The bos help string is:
     bos shutdown: shutdown all processes
     Usage: bos shutdown -server <machine name> [-instance <instances>+]
                         [-wait] [-cell <cell name>] [-noauth] [-localauth]
-    Where: -wait       wait for process to stop
 
 The corresponding method invocation looks like:
 
