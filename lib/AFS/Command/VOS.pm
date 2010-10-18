@@ -19,46 +19,54 @@ use AFS::Object::FileServer;
 use AFS::Object::Partition;
 use AFS::Object::Transaction;
 
-sub size {
+sub backupsys {
 
     my $self = shift;
     my %args = @_;
 
-    $self->operation( q{size} );
+    $self->operation( q{backupsys} );
 
     my $result = AFS::Object->new;
-
-    # This is because without -dump, the command is meaningless
-    $args{dump} = 1;
 
     $self->_parse_arguments(%args);
     $self->_save_stderr;
     $self->_exec_commands;
+
+    my @volumes = ();
 
     while ( defined($_ = $self->_handle->getline) ) {
 
         chomp;
 
         given ( $_ ) {
-            when ( m{Volume: (.*)}ms ) {
-                $result->_setAttribute( volume => $1 );
+
+            when ( m{Would have backed up volumes}ms ) {
+                while ( defined($_ = $self->_handle->getline) ) {
+                    chomp;
+                    last if m{^done};
+                    s{^\s+}{}ms;
+                    push @volumes, $_;
+                }
             }
-            when ( m{dump_size: (\d+)}ms ) {
-                $result->_setAttribute( dump_size => $1 );
+
+            when ( m{Creating backup volume for (\S+)}ms ) {
+                push @volumes, $1;
             }
+
+            when ( m{Total volumes backed up: (\d+); failed to backup: (\d+)}ms ) {
+                $result->_setAttribute( total => $1, failed => $2 );
+            }
+
         }
 
     }
 
-    $self->_restore_stderr;
+    $result->_setAttribute( volumes => \@volumes );
 
-    if ( $self->_errors =~ m{VLDB: no such entry}ms ) {
-        $self->_reap_commands( allowstatus => [ 1, 255 ] );
-        return;
-    } else {
-        $self->_reap_commands;
-        return $result;
-    }
+    $self->_restore_stderr;
+    $self->_reap_commands;
+
+    return $result;
 
 }
 
@@ -877,6 +885,49 @@ sub partinfo {
     $self->_reap_commands;
 
     return $result;
+
+}
+
+sub size {
+
+    my $self = shift;
+    my %args = @_;
+
+    $self->operation( q{size} );
+
+    my $result = AFS::Object->new;
+
+    # This is because without -dump, the command is meaningless
+    $args{dump} = 1;
+
+    $self->_parse_arguments(%args);
+    $self->_save_stderr;
+    $self->_exec_commands;
+
+    while ( defined($_ = $self->_handle->getline) ) {
+
+        chomp;
+
+        given ( $_ ) {
+            when ( m{Volume: (.*)}ms ) {
+                $result->_setAttribute( volume => $1 );
+            }
+            when ( m{dump_size: (\d+)}ms ) {
+                $result->_setAttribute( dump_size => $1 );
+            }
+        }
+
+    }
+
+    $self->_restore_stderr;
+
+    if ( $self->_errors =~ m{VLDB: no such entry}ms ) {
+        $self->_reap_commands( allowstatus => [ 1, 255 ] );
+        return;
+    } else {
+        $self->_reap_commands;
+        return $result;
+    }
 
 }
 

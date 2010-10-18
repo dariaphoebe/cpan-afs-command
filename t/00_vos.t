@@ -245,8 +245,6 @@ foreach my $force ( qw( none f force ) ) {
     );
 }
 
-
-
 # The volume is released, so now, let's examine the readonly, and make
 # sure we get the correct volume headers.
 $result = $vos->examine(
@@ -504,6 +502,33 @@ if ( $restorefilter ) {
     }
 
 }
+
+$result = $vos->backupsys;
+ok( ref $result && $result->isa( q{AFS::Object} ), q{vos->backupys} );
+ok( $result->total =~ m{^\d+$}ms, q{result->total is numeric} );    
+ok( $result->total > 0, q{result->total greater then zero} );    
+ok( $result->failed =~ m{^\d+$}ms, q{result->failed is numeric} );    
+ok( $result->failed == 0, q{result->failed is zero} );    
+
+ok(
+    $vos->offline(
+        server    => $server_primary,
+        partition => $partition_primary,
+        id        => $volname,
+        cell      => $cell,
+    ),
+    q{vos->offline},
+);
+
+$result = $vos->backupsys;
+ok( ref $result && $result->isa( q{AFS::Object} ), q{vos->backupys} );
+ok( $result->failed =~ m{^\d+$}ms, q{result->failed is numeric} );    
+ok( $result->failed > 0, q{result->failed greater then zero} );    
+
+throws_ok {
+    $vos->backupsys( cell => q{nosuchcell} );
+} qr{can.t find cell nosuchcell's hosts}ms,
+    q{vos->backupsys raises exception for bogus cell name};
 
 ok(
     $vos->remove(
