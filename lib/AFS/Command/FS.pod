@@ -32,11 +32,7 @@ class.  See that documentation for details.
 
 =back
 
-=head1 METHODS (with complex return values)
-
-=head2 NOTE: Error checking for commands that accept a list of paths
-
-XXX: Re-think how this will work with exceptions...
+=head1 METHODS (path commands)
 
 A number of these methods accept a list of paths, and will return
 information for each path, individually.  If you specify a
@@ -60,6 +56,553 @@ itself).
 
 This holds true for the following API methods: diskfree, examine,
 listquota, quota, storebehind, whereis, whichcell, and listacl.
+
+All of these commands return an AFS::Object::CacheManager object,
+which contains one or more AFS::Object::Path objects, one for each
+path specified in the arguments.  Each of these objects has the
+following attributes and methods:
+
+B<AFS::Object::CacheManager>
+
+    Methods                     Returns
+    -------                     -------
+    getPathNames                list of strings, each of which is a single pathname
+    getPaths                    list of AFS::Object::Path objects, one for each path
+    getPath($pathname)          a single AFS::Object::Path object, for the pathname $pathname
+
+=head2 diskfree
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs diskfree: show server disk space usage
+    Usage: fs diskfree [-path <dir/file path>+]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->diskfree(
+       # Optional arguments
+       path => $path, # OR [ $path1, $path2, ... ]
+    );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which is
+documented above.
+
+    my $result = $fs->diskfree(
+       path => [ $afspath, $ufspath, $boguspath ],
+    );
+
+    foreach my $pathobj ( $result->getPaths ) {
+        my $path = $pathobj->path;
+        if ( $pathobj->hasAttribute( q{error} ) ) {
+            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
+        } else {
+            foreach my $attr ( qw( volname used total avail percent ) ) {
+                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
+            }
+        }
+    }
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    error                       The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    volname                     The AFS volume name that contains the pathname
+    total                       The size (in KB) of the partition that contains 'volname'
+    used                        The amount of space (in KB) used on that partition
+    avail                       The amount of space (in KB) available on that partition
+    percent                     The amount of space used, as a percentage
+
+=back
+
+=head2 examine
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs examine: display volume status
+    Usage: fs examine [-path <dir/file path>+]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->examine(
+       # Optional arguments
+       path => $path, # OR [ $path1, $path2, ... ]
+    );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which is
+documented above.
+
+    my $result = $fs->examine(
+       path => [ $afspath, $ufspath, $boguspath ],
+    );
+
+    foreach my $pathobj ( $result->getPaths ) {
+        my $path = $pathobj->path;
+        if ( $pathobj->hasAttribute( q{error} ) ) {
+            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
+        } else {
+            foreach my $attr ( qw( id volname quota used avail total ) ) {
+                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
+            }
+        }
+    }
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    error                       The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    volname                     The AFS volume name that contains the pathname
+    id                          The numerical volume ID of the above volume
+    total                       The size (in KB) of the partition that contains 'volname'
+    used                        The amount of space (in KB) used on that partition
+    avail                       The amount of space (in KB) available on that partition
+    quota                       The quota of the volume (in KB), or 0 if set to "unlimited"
+
+=back
+
+=head2 getcalleraccess
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs getcalleraccess: list callers access 
+    Usage: fs getcalleraccess [-path <dir/file path>+]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->getcalleraccess(
+       # Optional arguments
+       path => $path, # OR [ $path1, $path2, ... ]
+    );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which is documented above.
+
+    my $result = $fs->getcalleraccess(
+        path => [ $afspath, $ufspath, $boguspath ],
+    );
+
+    foreach my $pathobj ( $result->getPaths ) {
+        my $path = $pathobj->path;
+        if ( $pathobj->hasAttribute( q{error} ) ) {
+            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
+        } else {
+            foreach my $attr ( qw( rights ) ) {
+                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
+            }
+        }
+    }
+
+=back
+
+=head2 listacl
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs listacl: list access control list
+    Usage: fs listacl [-path <dir/file path>+] [-id] [-if]
+    Where: -id  initial directory acl
+           -if  initial file acl
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->listacl(
+       # Required arguments
+       path => $path, # OR [ $path1, $path2, ... ]
+       # Optional arguments
+       id   => 1,
+       if   => 1,
+    );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which is
+documented above.
+
+    my $result = $fs->listacl(
+       path => [ $afspath, $ufspath, $boguspath ],
+    );
+
+    foreach my $pathobj ( $result->getPaths ) {
+        my $path = $pathobj->path;
+        if ( $pathobj->hasAttribute( q{error} ) ) {
+            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
+        } else {
+            foreach my $type ( qw( normal negative ) ) {
+                my $acl = $pathobj->getACL($type);
+                my %entries = $acl->getEntries;
+                foreach my $principal ( keys %entries ) {
+                    my $rights = $acl->getRights($principal);
+                    print qq{$type rights for $principal are $rights\n};
+                }
+            }
+        }
+    }
+
+Each AFS::Object::Path object contains one or two AFS::Object::ACL
+objects (one for normal, and one for negative).
+
+B<AFS::Object::Path>
+
+    Methods                     Returns
+    -------                     -------
+    getACLNormal                the AFS::Object::ACL object for the normal rights
+    getACLNegative              the AFS::Object::ACL object for the negative rights
+    getACL($type)               the AFS::Object::ACL object for rights of type $type,
+                                where $type is either 'normal' or 'negative'
+
+B<AFS::Object::ACL>
+
+    Methods                     Returns
+    -------                     -------
+    getPrincipals               a list of the principals (users, groups) on the ACL
+    getRights($principal)       the rights (permissions) of the specified $principal
+    getEntries                  a list of key/value pairs, where the keys are the principals,
+                                and the values are the rights for that principal
+
+=back
+
+=head2 listquota
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs listquota: list volume quota
+    Usage: fs listquota [-path <dir/file path>+]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->listquota(
+       # Optional arguments
+       path => $path, # OR [ $path1, $path2, ... ]
+    );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which is
+documented above.
+
+    my $result = $fs->listquota(
+       path => [ $afspath, $ufspath, $boguspath ],
+    );
+
+    foreach my $pathobj ( $result->getPaths ) {
+        my $path = $pathobj->path;
+        if ( $pathobj->hasAttribute( q{error} ) ) {
+            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
+        } else {
+            foreach my $attr ( qw( volname quota used percent partition ) ) {
+                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
+            }
+        }
+    }
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    error                       The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    volname                     The AFS volume name that contains the pathname
+    quota                       Volume quota, in KB
+    used                        The amount of space (in KB) used in that volume
+    percent                     The percentage of the allocated quota in use
+    partition                   The percentage of space used on the partition where the volume resides
+
+=back
+
+=head2 quota
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs quota: show volume quota usage
+    Usage: fs quota [-path <dir/file path>+]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->quota(
+       # Optional arguments
+       path => $path, # OR [ $path1, $path2, ... ]
+    );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which is
+documented above.
+
+    my $result = $fs->quota(
+       path => [ $afspath, $ufspath, $boguspath ],
+    );
+
+    foreach my $pathobj ( $result->getPaths ) {
+        my $path = $pathobj->path;
+        if ( $pathobj->hasAttribute( q{error} ) ) {
+            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
+        } else {
+            print qq{Path '$path' has quota '} . $pathobj->quota . qq{'\n};
+        }
+    }
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    error                       The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    quota                       The percentage of the allocated quota in use
+
+=back
+
+=head2 storebehind
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs storebehind: store to server after file close
+    Usage: fs storebehind [-kbytes <asynchrony for specified names>]
+                          [-files <specific pathnames>+] [-allfiles <new default (KB)>]
+                          [-verbose]
+    Where: -verbose  show status
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->storebehind(
+       # Optional arguments
+       kbytes   => $kbytes,
+       files    => $file, # OR [ $file1, $file2, ... ]
+       allfiles => $default,
+       verbose  => 1,
+    );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which is
+documented above.
+
+    my $result = $fs->quota(
+       path             => [ $afspath, $ufspath, $boguspath ],
+    );
+
+    foreach my $pathobj ( $result->getPaths ) {
+        my $path = $pathobj->path;
+        if ( $pathobj->hasAttribute( q{error} ) ) {
+            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
+        } else {
+            foreach my $attr ( qw( volname quota used percent partition ) ) {
+                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
+            }
+        }
+    }
+
+In addition to the usual methods available on the CacheManager object,
+the objects returned by this method will also have the following
+attribute as well:
+
+B<AFS::Object::CacheManager>
+
+    Attributes                  Values
+    ----------                  ------
+    asynchrony                  Default value (in KB) of asynchronous writes
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    error                       The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    asynchrony                  The number of KB of asynchronous writes for this file
+
+=back
+
+=head2 whereis
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs whereis: list file's location
+    Usage: fs whereis [-path <dir/file path>+]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->whereis(
+       # Optional arguments
+       path => $path, # OR [ $path1, $path2, ... ]
+    );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which is
+documented above.
+
+    my $result = $fs->whereis(
+       path             => [ $afspath, $ufspath, $boguspath ],
+    );
+
+    foreach my $pathobj ( $result->getPaths ) {
+        my $path = $pathobj->path;
+        if ( $pathobj->hasAttribute( q{error} ) ) {
+            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
+        } else {
+            print qq{Path '$path' is on hosts } . join( q{ ,}, @{ $pathobj->hosts} ) . qq{\n};
+        }
+    }
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    error                       The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    hosts                       An ARRAY reference of hostnames
+
+=back
+
+=head2 whichcell
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs whichcell: list file's cell
+    Usage: fs whichcell [-path <dir/file path>+]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->whichcell(
+       # Optional arguments
+       path => $path, # OR [ $path1, $path2, ... ]
+    );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which is
+documented above.
+
+    my $result = $fs->whichcell(
+       path => [ $afspath, $ufspath, $boguspath ],
+    );
+
+    foreach my $pathobj ( $result->getPaths ) {
+        my $path = $pathobj->path;
+        if ( $pathobj->hasAttribute( q{error} ) ) {
+            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
+        } else {
+            print qq{Path '$path' is in cell '} . $pathobj->cell . qq{'\n};
+        }
+    }
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    error                       The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    cell                        Cell in which the pathname lives
+
+=back
+
+=head1 METHODS (with complex return values)
 
 =head2 bypassthreshold
 
@@ -137,151 +680,6 @@ The object has the following attributes:
 Note that the interval attribute is only present if the interval
 argument was specified, and the servers list will be empty if nothing
 was down.
-
-=back
-
-=head2 diskfree
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs diskfree: show server disk space usage
-    Usage: fs diskfree [-path <dir/file path>+]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->diskfree(
-       # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-   );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which
-contains one or more AFS::Object::Path objects, one for each path
-specified in the arguments.
-
-    my $result = $fs->diskfree(
-       path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            foreach my $attr ( qw( volname used total avail percent ) ) {
-                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
-            }
-        }
-    }
-
-Each of these objects has the following attributes and methods:
-
-B<AFS::Object::CacheManager>
-
-    Methods                     Returns
-    -------                     -------
-    getPathNames                list of strings, each of which is a single pathname
-    getPaths                    list of AFS::Object::Path objects, one for each path
-    getPath($pathname)          a single AFS::Object::Path object, for the pathname $pathname
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    volname                     The AFS volume name that contains the pathname
-    total                       The size (in KB) of the partition that contains 'volname'
-    used                        The amount of space (in KB) used on that partition
-    avail                       The amount of space (in KB) available on that partition
-    percent                     The amount of space used, as a percentage
-
-=back
-
-=head2 examine
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs examine: display volume status
-    Usage: fs examine [-path <dir/file path>+]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->examine(
-       # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which
-contains one or more AFS::Object::Path objects, one for each path
-specified in the arguments.
-
-    my $result = $fs->examine(
-       path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            foreach my $attr ( qw( id volname quota used avail total ) ) {
-                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
-            }
-        }
-    }
-
-Each of these objects has the following attributes and methods:
-
-B<AFS::Object::CacheManager>
-
-    Methods                     Returns
-    -------                     -------
-    getPathNames                list of strings, each of which is a single pathname
-    getPaths                    list of AFS::Object::Path objects, one for each path
-    getPath($pathname)          a single AFS::Object::Path object, for the pathname $pathname
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    volname                     The AFS volume name that contains the pathname
-    id                          The numerical volume ID of the above volume
-    total                       The size (in KB) of the partition that contains 'volname'
-    used                        The amount of space (in KB) used on that partition
-    avail                       The amount of space (in KB) available on that partition
-    quota                       The quota of the volume (in KB), or 0 if set to "unlimited"
 
 =back
 
@@ -556,87 +954,6 @@ B<AFS::Object::Server>
 
 =back
 
-=head2 listacl
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs listacl: list access control list
-    Usage: fs listacl [-path <dir/file path>+] [-id] [-if]
-    Where: -id  initial directory acl
-           -if  initial file acl
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->listacl(
-       # Required arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-       # Optional arguments
-       id   => 1,
-       if   => 1,
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which
-contains one or more AFS::Object::Path objects, one for each path
-specified in the arguments.  Each AFS::Object::Path object contains
-one or two AFS::Object::ACL objects (one for normal, and one for
-negative).
-
-    my $result = $fs->listacl(
-       path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            foreach my $type ( qw( normal negative ) ) {
-                my $acl = $pathobj->getACL($type);
-                my %entries = $acl->getEntries;
-                foreach my $principal ( keys %entries ) {
-                    my $rights = $acl->getRights($principal);
-                    print qq{$type rights for $principal are $rights\n};
-                }
-            }
-        }
-    }
-
-The objects have the following attributes and methods:
-
-B<AFS::Object::CacheManager>
-
-    Methods                     Returns
-    -------                     -------
-    getPathNames                list of strings, each of which is a single pathname
-    getPaths                    list of AFS::Object::Path objects, one for each path
-    getPath($pathname)          a single AFS::Object::Path object, for the pathname $pathname
-
-B<AFS::Object::Path>
-
-    Methods                     Returns
-    -------                     -------
-    getACLNormal                the AFS::Object::ACL object for the normal rights
-    getACLNegative              the AFS::Object::ACL object for the negative rights
-    getACL($type)               the AFS::Object::ACL object for rights of type $type,
-                                where $type is either 'normal' or 'negative'
-
-B<AFS::Object::ACL>
-
-    Methods                     Returns
-    -------                     -------
-    getPrincipals               a list of the principals (users, groups) on the ACL
-    getRights($principal)       the rights (permissions) of the specified $principal
-    getEntries                  a list of key/value pairs, where the keys are the principals,
-                                and the values are the rights for that principal
-
-=back
-
 =head2 listaliases
 
 =over
@@ -735,78 +1052,6 @@ B<AFS::Object::Cell>
 
 =back
 
-=head2 listquota
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs listquota: list volume quota
-    Usage: fs listquota [-path <dir/file path>+]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->listquota(
-       # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
-
-=item Return Values
-
-=back
-
-This method returns an AFS::Object::CacheManager object, which
-contains one or more AFS::Object::Path objects, one for each path
-specified in the arguments.
-
-    my $result = $fs->listquota(
-       path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            foreach my $attr ( qw( volname quota used percent partition ) ) {
-                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
-            }
-        }
-    }
-
-Each of these objects has the following attributes and methods:
-
-B<AFS::Object::CacheManager>
-
-    Methods                     Returns
-    -------                     -------
-    getPathNames                list of strings, each of which is a single pathname
-    getPaths                    list of AFS::Object::Path objects, one for each path
-    getPath($pathname)          a single AFS::Object::Path object, for the pathname $pathname
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    volname                     The AFS volume name that contains the pathname
-    quota                       Volume quota, in KB
-    used                        The amount of space (in KB) used in that volume
-    percent                     The percentage of the allocated quota in use
-    partition                   The percentage of space used on the partition where the volume resides
-
 =head2 lsmount
 
 =over
@@ -887,150 +1132,6 @@ The following attributes may or may not be present:
 
 =back
 
-=head2 quota
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs quota: show volume quota usage
-    Usage: fs quota [-path <dir/file path>+]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->quota(
-       # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which
-contains one or more AFS::Object::Path objects, one for each path
-specified in the arguments.
-
-    my $result = $fs->quota(
-       path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            print qq{Path '$path' has quota '} . $pathobj->quota . qq{'\n};
-        }
-    }
-
-Each of these objects has the following attributes and methods:
-
-B<AFS::Object::CacheManager>
-
-    Methods                     Returns
-    -------                     -------
-    getPathNames                list of strings, each of which is a single pathname
-    getPaths                    list of AFS::Object::Path objects, one for each path
-    getPath($pathname)          a single AFS::Object::Path object, for the pathname $pathname
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    quota                       The percentage of the allocated quota in use
-
-=back
-
-=head2 storebehind
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs storebehind: store to server after file close
-    Usage: fs storebehind [-kbytes <asynchrony for specified names>]
-                          [-files <specific pathnames>+] [-allfiles <new default (KB)>]
-                          [-verbose]
-    Where: -verbose  show status
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->storebehind(
-       # Optional arguments
-       kbytes   => $kbytes,
-       files    => $file, # OR [ $file1, $file2, ... ]
-       allfiles => $default,
-       verbose  => 1,
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which
-contains one or more AFS::Object::Path objects, one for each path
-specified in the arguments.
-
-    my $result = $fs->quota(
-       path             => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            foreach my $attr ( qw( volname quota used percent partition ) ) {
-                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
-            }
-        }
-    }
-
-Each of these objects has the following attributes and methods:
-
-B<AFS::Object::CacheManager>
-
-    Attributes                  Values
-    ----------                  ------
-    asynchrony                  Default value (in KB) of asynchronous writes
-
-    Methods                     Returns
-    -------                     -------
-    getPathNames                list of strings, each of which is a single pathname
-    getPaths                    list of AFS::Object::Path objects, one for each path
-    getPath($pathname)          a single AFS::Object::Path object, for the pathname $pathname
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    asynchrony                  The number of KB of asynchronous writes for this file
-
-=back
-
 =head2 sysname
 
 =over
@@ -1073,138 +1174,6 @@ B<AFS::Object::CacheManager>
 
 NOTE: When a list of sysnames has been configured on the client, then
 the 'sysname' attribute is simnply the first one in the list.
-
-=back
-
-=head2 whereis
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs whereis: list file's location
-    Usage: fs whereis [-path <dir/file path>+]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->whereis(
-       # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which
-contains one or more AFS::Object::Path objects, one for each path
-specified in the arguments.
-
-    my $result = $fs->whereis(
-       path             => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            print qq{Path '$path' is on hosts } . join( q{ ,}, @{ $pathobj->hosts} ) . qq{\n};
-        }
-    }
-
-Each of these objects has the following attributes and methods:
-
-B<AFS::Object::CacheManager>
-
-    Methods                     Returns
-    -------                     -------
-    getPathNames                list of strings, each of which is a single pathname
-    getPaths                    list of AFS::Object::Path objects, one for each path
-    getPath($pathname)          a single AFS::Object::Path object, for the pathname $pathname
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    hosts                       An ARRAY reference of hostnames
-
-=back
-
-=head2 whichcell
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs whichcell: list file's cell
-    Usage: fs whichcell [-path <dir/file path>+]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->whichcell(
-       # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which
-contains one or more AFS::Object::Path objects, one for each path
-specified in the arguments.
-
-    my $result = $fs->whichcell(
-       path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            print qq{Path '$path' is in cell '} . $pathobj->cell . qq{'\n};
-        }
-    }
-
-Each of these objects has the following attributes and methods:
-
-B<AFS::Object::CacheManager>
-
-    Methods                     Returns
-    -------                     -------
-    getPathNames                list of strings, each of which is a single pathname
-    getPaths                    list of AFS::Object::Path objects, one for each path
-    getPath($pathname)          a single AFS::Object::Path object, for the pathname $pathname
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    cell                        Cell in which the pathname lives
 
 =back
 
