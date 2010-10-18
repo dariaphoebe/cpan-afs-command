@@ -136,7 +136,25 @@ sub supportsArgument {
     my $operation = shift;
     my $argument = shift;
     return if not $self->supportsOperation( $operation );
-    return $self->_operation_arguments( $operation )->{ $argument };
+    return exists $self->_operation_arguments( $operation )->{ $argument };
+}
+
+sub supportsArgumentRequired {
+    my $self = shift;
+    my $operation = shift;
+    my $argument = shift;
+    return if not $self->supportsArgument( $operation, $argument );
+    my $arguments = $self->_operation_arguments( $operation )->{ $argument };
+    return if exists $arguments->{required};
+}
+
+sub supportsArgumentOptional {
+    my $self = shift;
+    my $operation = shift;
+    my $argument = shift;
+    return if not $self->supportsArgument( $operation, $argument );
+    my $arguments = $self->_operation_arguments( $operation )->{ $argument };
+    return if exists $arguments->{optional};
 }
 
 sub _operation_arguments {
@@ -195,12 +213,12 @@ sub _operation_arguments {
                     $arguments->{required}->{$1} = [];
                 } elsif ( s{^\s*-(\w+?)\s+<[^>]*?>\s*}{}ms ) {
                     $arguments->{required}->{$1} = 1;
-                } elsif ( s{^\s*-(\w+?)\s*}{}ms ) {
+                } elsif ( s{^\s*-(\w+?)(:?\s+|$)}{}ms ) {
                     $arguments->{required}->{$1} = 0;
                 } else {
                     croak(
                         qq{Unable to parse $command help for $operation\n},
-                        qq{Unrecognized string: '$_'}
+                        qq{Unrecognized string: '$_'},
                     );
                 }
             }

@@ -32,6 +32,10 @@ class.  See that documentation for details.
 
 =item supportsArgument
 
+=item supportsArgumentRequired
+
+=item supportsArgumentOptional
+
 =back
 
 =head1 METHODS (with complex return values)

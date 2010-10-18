@@ -30,6 +30,10 @@ class.  See that documentation for details.
 
 =item supportsArgument
 
+=item supportsArgumentRequired
+
+=item supportsArgumentOptional
+
 =back
 
 =head1 METHODS (path commands)
@@ -1240,6 +1244,61 @@ the 'sysname' attribute is simnply the first one in the list.
 
 =back
 
+=head2 uuid
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs uuid: manage the UUID for the cache manager 
+    Usage: fs uuid -generate
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->uuid(
+        # Optional argument (see below)
+        generate => 1, 
+    );
+
+NOTE: The -generate option is optional only for OpenAFS versions 1.5.8
+or newer, and the uuid command was only introduced in OpenAFS 1.4.5.
+For versions prior to 1.5.8, this command will return a true/false
+value, but for 1.5.8 and beyond, it return an object containing the
+uuid value.
+
+=item Return Values
+
+The return value for this method depends on the version of the fs
+command being used.  See above for the version details.  If the fs
+command returns the uuid, then this method returns an
+AFS::Object::CacheManager object which has one attribute.
+
+    Attributes                  Values
+    ----------                  ------
+    uuid                        The UUID of the AFS client
+
+If the fs command does B<NOT> return the uuid, then this method simply
+returns a true/false value, not an object.  This can be handled
+programmatically as follows:
+
+    if ( $fs->supportsOperation( q{uuid} ) {
+        if ( $fs->supportsArgumentRequired( qw( uuid generate ) ) {
+            $fs->uuid( generate => 1 );
+        } else {
+            my $result = $fs->uuid;
+            my $old_uuid = $result->uuid;
+            $result = $fs->uuid( generate => 1 );
+            my $new_uuid = $result->uuid;
+            warn qq{UUID changed from $old_uuid to $new_uuid\n};
+        }
+    } else {
+        die qq{Unable to set the uuid\n};
+    } 
+
+=back
+
 =head2 wscell
 
 =over
@@ -1588,6 +1647,20 @@ The corresponding method invocation looks like:
        # Optional arguments
        blocks => $blocks,
        reset  => 1,
+    );
+
+=head2 setcbaddr
+
+The fs help string is:
+
+    fs setcbaddr: configure callback connection address 
+    Usage: fs setcbaddr [-addr <host name or address>]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->setcbaddr(
+       # Optional arguments
+       addr => $addr,
     );
 
 =head2 setcell

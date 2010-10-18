@@ -343,6 +343,15 @@ ok(
     q{vos->remove},
 );
 
+if ( $fs->supportsOperation( q{uuid} ) ) {
+    if ( $fs->supportsArgumentOptional( qw( uuid generate ) ) ) {
+        # NOT testing generation -- too dangerous
+        my $result = $fs->uuid;
+        ok( ref $result && $result->isa( q{AFS::Object::CacheManager} ), q{fs->uuid} );
+        ok( $result->uuid, q{result->uuid} );
+    }
+}
+
 done_testing();
 exit 0;
 

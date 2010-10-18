@@ -105,6 +105,22 @@ tested for easily.
 
 The return value is simply true or false.
 
+=head2 supportsArgumentRequired, supportsArgumentOptional
+
+Similar to supportsArgument, these methods tests whether the specified
+argument is required/optional or not.  This returns true only if the
+argument is supported AND either required of optional.
+
+    if ( $fs->supportsOperation( q{uuid} ) {
+        if ( $fs->supportsArgumentRequired( qw( uuid generate ) ) {
+            warn qq{This fs binary can be used to set but NOT query the uuid\n};
+        } else {
+            warn qq{This fs binary can be used to set AND query the uuid\n};
+        }
+    } else {
+        warn qq{This fs binary can not set the uuid\n};
+    } 
+
 =head1 SEE ALSO
 
 AFS::Command::VOS(1), AFS::Command::BOS(1), AFS::Command::PTS(1),

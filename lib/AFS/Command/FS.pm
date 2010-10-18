@@ -853,6 +853,57 @@ sub sysname {
 
 }
 
+sub uuid {
+
+    my $self = shift;
+    my %args = @_;
+
+    if ( $self->supportsArgumentRequired( qw( uuid generate ) ) ) {
+        return $self->_uuid_simple(%args);
+    } else {
+        return $self->_uuid_complex(%args);
+    }
+
+}
+
+sub _uuid_simple {
+    my $self = shift;
+    $self->operation( q{uuid} );
+    $self->_parse_arguments(@_);
+    $self->_exec_commands( stderr => q{stdout} );
+    $self->_parse_output;
+    $self->_reap_commands;
+    return 1;
+}
+
+sub _uuid_complex {
+
+    my $self = shift;
+    my %args = @_;
+
+    my $result = AFS::Object::CacheManager->new;
+
+    $self->operation( q{uuid} );
+
+    $self->_parse_arguments(%args);
+    $self->_save_stderr;
+    $self->_exec_commands;
+
+
+    while ( defined($_ = $self->_handle->getline) ) {
+        chomp;
+        if ( m{UUID: (\S+)}ms ) {
+            $result->_setAttribute( uuid => $1 );
+        }
+    }
+
+    $self->_restore_stderr;
+    $self->_reap_commands;
+
+    return $result;
+
+}
+
 sub wscell {
 
     my $self = shift;
