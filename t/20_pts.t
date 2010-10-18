@@ -204,6 +204,11 @@ foreach my $name ( $ptsgroup, $ptsuser ) {
 
 }
 
+ok( ! $pts->supportsArgument( q{membership}, q{supergroups} ),
+    q{bos->membership support of supergroups suppressed} );
+ok( ! $pts->supportsArgument( q{membership}, q{expandgroup} ),
+    q{bos->membership support of expandgroups suppressed} );
+
 if ( $pts->supportsOperation( q{listentries} ) ) {
 
     foreach my $name ( $ptsgroup, $ptsuser ) {

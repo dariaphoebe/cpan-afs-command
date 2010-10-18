@@ -22,6 +22,23 @@ This module implements an OO API wrapper around the AFS 'pts' command.
 The supported methods depend on the version of the pts binary used,
 and are determined automagically.
 
+=head1 METHODS -- Unsupported
+
+All of the following commands are unsupported, since they are only
+necessary when using pts interactively:
+
+=over
+
+=item interactive
+
+=item quit
+
+=item sleep
+
+=item source
+
+=back
+
 =head1 METHODS -- Inherited
 
 All of the following methods are inherited from the AFS::Command::Base
@@ -51,18 +68,22 @@ The pts help string is:
     Usage: pts creategroup -name <group name>+ [-owner <owner of the group>]
                            [-id <id (negated) for the group>+]
                            [-cell <cell name>] [-noauth] [-force]
+                           [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->creategroup(
        # Required arguments
-       name   => $name,
+       name      => $name,
        # Optional arguments
-       owner  => $owner,
-       id     => $id,
-       cell   => $cell,
-       noauth => 1,
-       force  => 1,
+       owner     => $owner,
+       id        => $id,
+       cell      => $cell,
+       noauth    => 1,
+       force     => 1,
+       localauth => 1,
+       auth      => 1,
+       encrypt   => 1,
     );
 
 NOTE: For more robust exception handling of individual group creation,
@@ -117,18 +138,22 @@ The pts help string is:
     pts createuser: create a new user
     Usage: pts createuser -name <user name>+ [-id <user id>+]
                           [-cell <cell name>] [-noauth] [-force]
+                          [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->createuser(
        # Required arguments
-       name   => $name,
+       name      => $name,
        # Optional arguments
-       owner  => $owner,
-       id     => $id,
-       cell   => $cell,
-       noauth => 1,
-       force  => 1,
+       owner     => $owner,
+       id        => $id,
+       cell      => $cell,
+       noauth    => 1,
+       force     => 1,
+       localauth => 1,
+       auth      => 1,
+       encrypt   => 1,
     );
 
 NOTE: For more robust exception handling of individual user creation,
@@ -183,16 +208,20 @@ The pts help string is:
     pts examine: examine an entry
     Usage: pts examine -nameorid <user or group name or id>+
                        [-cell <cell name>] [-noauth] [-force]
+                       [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->examine(
        # Required arguments
-       nameorid => $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
+       nameorid  => $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
        # Optional arguments
-       cell     => $cell,
-       noauth   => 1,
-       force    => 1,
+       cell      => $cell,
+       noauth    => 1,
+       force     => 1,
+       localauth => 1,
+       auth      => 1,
+       encrypt   => 1,
     );
 
 =item Return Values
@@ -259,19 +288,20 @@ The pts help string is:
 
     pts listentries: list users/groups in the protection database
     Usage: pts listentries [-users] [-groups] [-cell <cell name>]
-                           [-noauth] [-force]
-    Where: -users   list user entries
-           -groups  list group entries
+                           [-noauth] [-force] [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->listentries(
        # Optional arguments
-       users  => 1,
-       groups => 1,
-       cell   => $cell,
-       noauth => 1,
-       force  => 1,
+       users     => 1,
+       groups    => 1,
+       cell      => $cell,
+       noauth    => 1,
+       force     => 1,
+       localauth => 1,
+       auth      => 1,
+       encrypt   => 1,
     );
 
 =item Return Values
@@ -330,15 +360,18 @@ B<AFS::Object::User>, B<AFS::Object::Group>
 The pts help string is:
 
     pts listmax: list max id
-    Usage: pts listmax [-cell <cell name>] [-noauth] [-force]
+    Usage: pts listmax [-cell <cell name>] [-noauth] [-force] [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->listmax(
        # Optional arguments
-       cell   => $cell,
-       noauth => 1,
-       force  => 1,
+       cell      => $cell,
+       noauth    => 1,
+       force     => 1,
+       localauth => 1,
+       auth      => 1,
+       encrypt   => 1,
     );
 
 =item Return Values
@@ -373,16 +406,20 @@ The pts help string is:
     pts listowned: list groups owned by an entry or zero id gets orphaned groups
     Usage: pts listowned -nameorid <user or group name or id>+
                          [-cell <cell name>] [-noauth] [-force]
+                         [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->listowned(
        # Required arguments
-       nameorid => $nameorid,
+       nameorid  => $nameorid,
        # Optional arguments
-       cell     => $cell,
-       noauth   => 1,
-       force    => 1,
+       cell      => $cell,
+       noauth    => 1,
+       force     => 1,
+       localauth => 1,
+       auth      => 1,
+       encrypt   => 1,
     );
 
 NOTE: In order to parse the output of this command deterministically,
@@ -450,7 +487,9 @@ The pts help string is:
 
     pts membership: list membership of a user or group
     Usage: pts membership -nameorid <user or group name or id>+
+                          [-supergroups] [-expandgroups]
                           [-cell <cell name>] [-noauth] [-force]
+                          [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
@@ -458,10 +497,27 @@ The corresponding method invocation looks like:
        # Required arguments
        nameorid => $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
        # Optional arguments
-       cell     => $cell,
-       noauth   => 1,
-       force    => 1,
+       supergroups  => 1, # See below
+       expandgroups => 1, # See below
+       cell         => $cell,
+       noauth       => 1,
+       force        => 1,
+       localauth    => 1,
+       auth         => 1,
+       encrypt      => 1,
     );
+
+NOTE: This version of the API does not yet supported parsing the
+output of this command when either -supergroups or -expandgroups is
+specified.  Until this support is implemented, neither argument will
+be supported.  This means that:
+
+    $bos->supportsArgument( q{membership}, q{supergroups} )
+    $bos->supportsArgument( q{membership}, q{expandgroup} )
+
+will return false, even if your pts binary supports -supergroups
+and/or -expandgroups.  Support for both options should be available
+before AFS::Command is released as 2.X.
 
 =item Return Values
 
@@ -527,17 +583,20 @@ The pts help string is:
     pts adduser: add a user to a group
     Usage: pts adduser -user <user name>+ -group <group name>+
                        [-cell <cell name>] [-noauth] [-force]
+                       [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->adduser(
        # Required arguments
-       user   => $user, # OR [ $user1, $user2, ... ]
-       group  => $group, # OR [ $group1, $group2, ... ]
+       user    => $user,  # OR [ $user1, $user2, ... ]
+       group   => $group, # OR [ $group1, $group2, ... ]
        # Optional arguments
-       cell   => $cell,
-       noauth => 1,
-       force  => 1,
+       cell    => $cell,
+       noauth  => 1,
+       force   => 1,
+       auth    => 1,
+       encrypt => 1,
     );
 
 =head2 chown
@@ -547,17 +606,20 @@ The pts help string is:
     pts chown: change ownership of a group
     Usage: pts chown -name <group name> -owner <new owner>
                      [-cell <cell name>] [-noauth] [-force]
+                     [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->chown(
        # Required arguments
-       name   => $name,
-       owner  => $owner,
+       name    => $name,
+       owner   => $owner,
        # Optional arguments
-       cell   => $cell,
-       noauth => 1,
-       force  => 1,
+       cell    => $cell,
+       noauth  => 1,
+       force   => 1,
+       auth    => 1,
+       encrypt => 1,
     );
 
 =head2 delete
@@ -567,6 +629,7 @@ The pts help string is:
     pts delete: delete a user or group from database
     Usage: pts delete -nameorid <user or group name or id>+
                       [-cell <cell name>] [-noauth] [-force]
+                      [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
@@ -577,6 +640,8 @@ The corresponding method invocation looks like:
        cell     => $cell,
        noauth   => 1,
        force    => 1,
+       auth     => 1,
+       encrypt  => 1,
     );
 
 =head2 removeuser
@@ -586,17 +651,20 @@ The pts help string is:
     pts removeuser: remove a user from a group
     Usage: pts removeuser -user <user name>+ -group <group name>+
                           [-cell <cell name>] [-noauth] [-force]
+                          [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->removeuser(
        # Required arguments
-       user   => $user, # OR [ $user1, $user2, ... ]
-       group  => $group, # OR [ $group1, $group2, ... ]
+       user    => $user, # OR [ $user1, $user2, ... ]
+       group   => $group, # OR [ $group1, $group2, ... ]
        # Optional arguments
-       cell   => $cell,
-       noauth => 1,
-       force  => 1,
+       cell    => $cell,
+       noauth  => 1,
+       force   => 1,
+       auth    => 1,
+       encrypt => 1,
     );
 
 =head2 rename
@@ -606,6 +674,7 @@ The pts help string is:
     pts rename: rename user or group
     Usage: pts rename -oldname <old name> -newname <new name>
                       [-cell <cell name>] [-noauth] [-force]
+                      [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
@@ -617,6 +686,8 @@ The corresponding method invocation looks like:
        cell    => $cell,
        noauth  => 1,
        force   => 1,
+       auth    => 1,
+       encrypt => 1,
     );
 
 =head2 setfields
@@ -627,6 +698,7 @@ pts setfields: set fields for an entry
 Usage: pts setfields -nameorid <user or group name or id>+ [-access <set privacy flags>]
                      [-groupquota <set limit on group creation>]
                      [-cell <cell name>] [-noauth] [-force]
+                     [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
@@ -639,6 +711,8 @@ The corresponding method invocation looks like:
        cell       => $cell,
        noauth     => 1,
        force      => 1,
+       auth       => 1,
+       encrypt    => 1,
     );
 
 =head2 setmax
@@ -648,16 +722,19 @@ The pts help string is:
     pts setmax: set max id
     Usage: pts setmax [-group <group max>] [-user <user max>]
                       [-cell <cell name>] [-noauth] [-force]
+                      [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
     my $result = $pts->setmax(
        # Optional arguments
-       user   => $user,
-       group  => $group,
-       cell   => $cell,
-       noauth => 1,
-       force  => 1,
+       user    => $user,
+       group   => $group,
+       cell    => $cell,
+       noauth  => 1,
+       force   => 1,
+       auth    => 1,
+       encrypt => 1,
     );
 
 =head1 SEE ALSO

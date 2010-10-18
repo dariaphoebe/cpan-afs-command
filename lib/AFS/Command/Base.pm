@@ -224,6 +224,14 @@ sub _operation_arguments {
         $arguments->{optional}->{id}   = 1;
     }
 
+    # Niether of these options is supported by the parsing logic for
+    # pts membership yet, so both options will appear to be
+    # unsupported until that code is written.
+    if ( $operation eq q{membership} ) {
+        delete $arguments->{optional}->{supergroups};
+        delete $arguments->{optional}->{expandgroups};
+    }
+
     #
     # XXX -- Hack Alert!!!
     #
