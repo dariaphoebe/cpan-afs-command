@@ -55,8 +55,8 @@ attribute, and nothing else (no other data attributes, except the path
 itself).
 
 This holds true for the following API methods: diskfree, examine,
-getcalleraccess, listacl, listquota, quota, storebehind, whereis, and
-whichcell.
+getcalleraccess, getfid, listacl, listquota, quota, storebehind,
+whereis, and whichcell.
 
 All of these commands return an AFS::Object::CacheManager object,
 which contains one or more AFS::Object::Path objects, one for each
@@ -217,6 +217,45 @@ The corresponding method invocation looks like:
 This method returns an AFS::Object::CacheManager object, which is documented above.
 
     my $result = $fs->getcalleraccess(
+        path => [ $afspath, $ufspath, $boguspath ],
+    );
+
+    foreach my $pathobj ( $result->getPaths ) {
+        my $path = $pathobj->path;
+        if ( $pathobj->hasAttribute( q{error} ) ) {
+            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
+        } else {
+            foreach my $attr ( qw( rights ) ) {
+                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
+            }
+        }
+    }
+
+=back
+
+=head2 getfid
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs getcalleraccess: list callers access 
+    Usage: fs getcalleraccess [-path <dir/file path>+]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->getcalleraccess(
+       # Optional arguments
+       path => $path, # OR [ $path1, $path2, ... ]
+    );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which is documented above.
+
+    my $result = $fs->getfid(
         path => [ $afspath, $ufspath, $boguspath ],
     );
 

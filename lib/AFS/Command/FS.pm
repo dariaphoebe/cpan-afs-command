@@ -339,6 +339,67 @@ sub _default_asynchrony {
 
 }
 
+# NOTE: This *should* be a _paths_method command, however, getfid has
+# some serious issues.
+#
+
+sub getfid {
+
+    my $self = shift;
+    my %args = @_;
+
+    my $result = AFS::Object::CacheManager->new;
+
+    $self->operation( q{getfid} );
+
+    $self->_parse_arguments(%args);
+    $self->_exec_commands( stderr => q{stdout} );
+    
+    my @paths = ref $args{path} eq q{ARRAY} ? @{$args{path}} : ($args{path});
+    my %paths = map { $_ => 1 } @paths;
+
+    while ( defined($_ = $self->_handle->getline) ) {
+
+        chomp;
+
+        #
+        # NOTE: As of OpenAFS 1.5.77, getfid does NOT return this
+        # information.  This will be patched, but most fs binaries
+        # will NOT generate this.
+        #
+        if ( m{fs: Invalid argument; it is possible that (.*) is not in AFS.}ms ||
+             m{fs: no such cell as \'(.*)\'}ms ||
+             m{fs: File \'(.*)\' doesn\'t exist}ms ||
+             m{fs: You don\'t have the required access rights on \'(.*)\'}ms ) {
+            my $path = AFS::Object::Path->new;
+            $path->_setAttribute( path  => $1, error => $_ );
+            delete $paths{$1};
+            $result->_addPath($path);
+        } elsif ( m{File (.*) \(\d+\.(.*)\) contained in volume (\d+)}ms ) {
+            my $path = AFS::Object::Path->new;
+            $path->_setAttribute( path => $1, fid => $2, volume => $3 );
+            delete $paths{$1};
+            $result->_addPath($path);
+        }
+
+    }
+
+    foreach my $pathname ( keys %paths ) {
+        my $path = AFS::Object::Path->new(
+            path  => $pathname,
+            error => q{Unable to determine results},
+        );
+        $result->_addPath($path);
+    }
+
+    # NOTE: Also as of OpenAFS 1.5.77, getfid always exits 0, but this
+    # is also being patched.
+    $self->_reap_commands( allowstatus => 1 );
+
+    return $result;
+
+}
+
 sub bypassthreshold {
 
     my $self = shift;

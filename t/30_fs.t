@@ -75,6 +75,7 @@ my %pathops = (
     diskfree        => [qw( volname total used avail percent )],
     examine         => [qw( volname total avail id quota )],
     getcalleraccess => [qw( rights )],
+    getfid          => [qw( fid volume )],
     listquota       => [qw( volname quota used percent partition )],
     quota           => [qw( percent )],
     storebehind     => [qw( asynchrony )],
