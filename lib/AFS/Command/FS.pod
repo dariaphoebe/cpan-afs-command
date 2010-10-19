@@ -235,6 +235,23 @@ This method returns an AFS::Object::CacheManager object, which is documented abo
         }
     }
 
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    error                       The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes                  Values
+    ----------                  ------
+    path                        The pathname
+    rights                      Caller's ACL rights on that path
+
 =back
 
 =head2 getfid
