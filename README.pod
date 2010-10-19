@@ -145,11 +145,13 @@ older pts commands (we are B<NOT> going to require users of
 AFS::Command to upgrade to the latest OpenAFS release just to use this
 code).
 
-The authors have chosen to optimize AFS::Command for robustness over
+The author has chosen to optimize AFS::Command for robustness over
 performance, and some of the pts commands no longer accept a list of
 names, in order to make the parsing logic manageable.  This affects
 the use of the following pts commands:
 
+    createuser
+    creategroup
     listowned
 
 The documentation has been updated to make a note of this, but if you

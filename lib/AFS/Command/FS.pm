@@ -487,7 +487,7 @@ sub exportafs {
     my $self = shift;
     my %args = @_;
 
-    my $result = AFS::Object->new;
+    my $result = AFS::Object::CacheManager->new;
 
     $self->operation( q{exportafs} );
 
