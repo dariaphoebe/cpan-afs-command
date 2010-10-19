@@ -64,7 +64,7 @@ my $servers = $result->servers;
 ok( ref $servers eq q{ARRAY}, q{result->servers} );
 
 $result = $fs->checkservers( interval => 0 );
-ok( ref $result && $result->isa( q{AFS::Object::CacheManager} ), q{ $fs->checkservers with interval} );
+ok( ref $result && $result->isa( q{AFS::Object::CacheManager} ), q{fs->checkservers with interval} );
 
 ok( $result->interval =~ m{^\d+$}ms, q{result->interval} );
 
