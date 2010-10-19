@@ -289,13 +289,20 @@ If no errors were encountered, then the following attributes will be present:
     Attributes                  Values
     ----------                  ------
     path                        The pathname
-    fid                         The FID for that path (eg. x.y)
     volume                      The volume ID for that path
+    vnode                       The FID vnode for that path
+    unique                      The FID uniquifier for that path
+    cell                        The cell for that path[*]
 
 NOTE: The errors returned will almost always be "Unable to determine
 results".  As of OpenAFS 1.5.77, the getfid command returns no errors
 at all when it can not determine the FID, and the exit code is always
 zero.
+
+[*] This is only available in very recent versions of OpenAFS, since
+getfid was not modified to display the cell until late in 2010.  For a
+more reliable mechanism, use whichcell, which works with all existing
+fs binaries.
 
 =back
 

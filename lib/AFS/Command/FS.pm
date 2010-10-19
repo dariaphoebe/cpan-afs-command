@@ -341,7 +341,6 @@ sub _default_asynchrony {
 
 # NOTE: This *should* be a _paths_method command, however, getfid has
 # some serious issues.
-#
 
 sub getfid {
 
@@ -362,6 +361,8 @@ sub getfid {
 
         chomp;
 
+        my $path = AFS::Object::Path->new;
+
         #
         # NOTE: As of OpenAFS 1.5.77, getfid does NOT return this
         # information.  This will be patched, but most fs binaries
@@ -371,17 +372,29 @@ sub getfid {
              m{fs: no such cell as \'(.*)\'}ms ||
              m{fs: File \'(.*)\' doesn\'t exist}ms ||
              m{fs: You don\'t have the required access rights on \'(.*)\'}ms ) {
-            my $path = AFS::Object::Path->new;
             $path->_setAttribute( path  => $1, error => $_ );
-            delete $paths{$1};
-            $result->_addPath($path);
-        } elsif ( m{File (.*) \(\d+\.(.*)\) contained in volume (\d+)}ms ) {
-            my $path = AFS::Object::Path->new;
-            $path->_setAttribute( path => $1, fid => $2, volume => $3 );
-            delete $paths{$1};
-            $result->_addPath($path);
+        } elsif ( m{File (.*) \((\d+)\.(\d+)\.(\d+)\) contained in volume \d+}ms ) {
+            $path->_setAttribute(
+                path   => $1,
+                volume => $2,
+                vnode  => $3,
+                unique => $4,
+            );
+        } elsif ( m{File (.*) \((\d+)\.(\d+)\.(\d+)\) located in cell (\S+)}ms ) {
+            $path->_setAttribute(
+                path   => $1,
+                volume => $2,
+                vnode  => $3,
+                unique => $4,
+                cell   => $5,
+            );
         }
 
+        if ( $path->path ) {
+            delete $paths{ $path->path };
+            $result->_addPath($path);
+        }
+        
     }
 
     foreach my $pathname ( keys %paths ) {
