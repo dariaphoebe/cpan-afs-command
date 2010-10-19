@@ -17,6 +17,30 @@ use AFS::Object::Cell;
 use AFS::Object::Server;
 use AFS::Object::ACL;
 
+sub getpathinfo {
+
+    my $self = shift;
+    my %args = @_;
+
+    my $method = delete $args{method} ||
+        croak qq{Missing required argument: method\n};
+
+    my $pathkey = $method eq q{storebehind} ? q{files} : q{path};
+
+    if ( ref $args{$pathkey} ) {
+        croak qq{Invalid argument: $pathkey is a reference\n};
+    }
+
+    my ($result) = $self->_paths_method( $method, %args )->getPaths;
+
+    if ( $result->error ) {
+        croak $result->error;
+    }
+
+    return $result;
+
+}
+
 sub diskfree {
     return shift->_paths_method( q{diskfree}, @_ );
 }

@@ -36,6 +36,34 @@ class.  See that documentation for details.
 
 =back
 
+=head1 METHODS (wrapper methods)
+
+=head2 getpathinfo
+
+Exception handling when using the path methods can be very tedious.
+In many cases, you either want the AFS::Object::Path object for a
+given path, or you want to raise an exception.  Due to the way the
+path command methods are implemented to support querying multiple
+paths, you end up with code that looks like this:
+
+    my $cm = $fs->listacl( path => $path );
+    my $pathobj = $cm->getPath( $path );
+    if ( $pathobj->error ) {
+        die qq{ARGHH!!!\n} . $pathobj->error;
+    }
+
+A simple wrapper method can be used to accomplish this, as follows:
+
+    my $pathobj = $fs->getpathinfo( method => q{listacl}, path => $path );
+
+The getpathinfo method takes one additional key/value pair in addition
+to the arguments of the method being wrapped, and that is the method
+being wrapped.  The rest of the arguments are passed to that method
+as-is.  However, getpathinfo can only be called for a single path.
+Passing an ARRAY reference will result in an exception.
+
+The return value is the AFS::Object::Path object for the given path.
+
 =head1 METHODS (path commands)
 
 A number of these methods accept a list of paths, and will return
