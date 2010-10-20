@@ -19,6 +19,27 @@ use AFS::Object::FileServer;
 use AFS::Object::Partition;
 use AFS::Object::Transaction;
 
+sub getVLDBEntry {
+
+    my $self = shift;
+    my %args = @_;
+
+    if ( not $args{name} ) {
+        croak qq{Missing required argument: name\n};
+    }
+
+    if ( ref $args{name} ) {
+        croak qq{Invalid argument: name is a reference\n};
+    }
+
+    my $result = $self->listvldb( %args );
+
+    return if not $result;
+
+    return $result->getVLDBEntry( name => $args{name} );
+
+}
+
 sub backupsys {
 
     my $self = shift;

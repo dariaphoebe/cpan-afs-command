@@ -187,6 +187,20 @@ for ( my $index = 0 ; $index <= $#servers ; $index++ ) {
     );
 }
 
+throws_ok {
+    $vos->getVLDBEntry( cell => $cell );
+} qr{Missing required argument: name}ms,
+    q{vos->getVLDBEntry raises exception when passed no name};
+
+throws_ok {
+    $vos->getVLDBEntry( name => [qw(a b)], cell => $cell );
+} qr{Invalid argument: name is a reference}ms,
+    q{vos->getVLDBEntry raises exception when name is a reference};
+
+$result = $vos->getVLDBEntry( name => $volname, cell => $cell );
+ok( ref $result && $result->isa( q{AFS::Object::VLDBEntry} ),
+    q{vos->getVLDBEntry returns correct object} );
+
 ok( ! $vos->listvldb( name => q{nosuchvolume}, cell => $cell ),
     q{vos->listvldb returns false for no vldb entry} );
 

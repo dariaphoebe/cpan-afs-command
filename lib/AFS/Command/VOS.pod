@@ -41,6 +41,23 @@ class.  See that documentation for details.
 
 =back
 
+=head1 METHODS (wrapper methods)
+
+=head2 getVLDBEntry
+
+This method is a simple shorthand for the following common use case:
+
+    my $result = $vos->listvldb( name => $name, cell => $cell );
+    my $vldbentry = $result->getVLDBEntry( name => $name );
+
+When querying the VLDB entry for a single volume, the VLDBEntry object
+can be queried directly using this wrapper method instead:
+
+    my $vldbentry = $vos->getVLDBEntry( name => $name, cell => $cell );
+
+The name is a required argment, and it must be a scalar, not an ARRAY
+reference.
+
 =head1 METHODS (dump, restore)
 
 Both the 'dump' and 'restore' methods are special, since this API
