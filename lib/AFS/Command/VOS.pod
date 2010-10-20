@@ -499,6 +499,7 @@ The following attributes should always be present:
     name                        Volume name
     rwrite                      Numeric Volume ID for the RW volume
     locked                      Boolean value, indicating the VLDB entry is locked or not
+    sites                       Number of VLDB sites
 
 The following attributes may be present, if there are volumes of the
 associated type in the VLDB entry:
@@ -979,6 +980,7 @@ volume (again, see the 'examine' documentation for more verbosity).
     backup                      Numeric Volume ID for the BK volume
     rclone                      Numeric Volume ID for the RClone volume, if present
     locked                      Boolean, indicating whether or not the VLDB entry is locked
+    sites                       Number of VLDB sites
 
     Methods                     Returns
     -------                     -------

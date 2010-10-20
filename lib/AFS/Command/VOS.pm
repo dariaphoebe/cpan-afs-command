@@ -393,6 +393,8 @@ sub examine {
         #
         if ( m{^\s+number of sites ->\s+(\d+)}ms ) {
 
+            $entry->_setAttribute( sites => $1 );
+
             while ( defined($_ = $self->_handle->getline) ) {
 
                 chomp;
@@ -631,6 +633,8 @@ sub listvldb {
             if ( m{^\s+number of sites ->\s+(\d+)}ms ) {
 
                 my $sites = $1;
+
+                $entry->_setAttribute( sites => $sites );
 
                 while ( defined($_ = $self->_handle->getline) ) {
 

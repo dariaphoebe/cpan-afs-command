@@ -221,6 +221,8 @@ ok( $volname eq $volname_queried, q{volname is correct} );
 $vldbentry = $result->getVLDBEntryByName($volname);
 ok( ref $vldbentry && $vldbentry->isa("AFS::Object::VLDBEntry"), q{result->getVLDBEntryByName} );
 
+ok( $vldbentry->sites == $#servers + 2, q{vldbentry->sites} );
+
 $rwrite = $vldbentry->rwrite;
 my $altentry = $result->getVLDBEntryById($rwrite);
 ok( ref $altentry && $altentry->isa("AFS::Object::VLDBEntry"), q{result->getVLDBEntryById} );
@@ -277,6 +279,11 @@ for ( my $index = 0 ; $index <= $#headers ; $index++ ) {
     ok( $header->server eq $servers[$index], qq{header->server $index} );
     ok( $header->type eq q{RO}, qq{header->type $index} );
 }
+
+$vldbentry = $result->getVLDBEntry;
+ok( ref $vldbentry && $vldbentry->isa( q{AFS::Object::VLDBEntry} ),
+    q{result->getVLDBEntry returns correct object} );
+ok( $vldbentry->sites == $#servers + 2, q{vldbentry->sites} );
 
 # Finally, let's clean up after ourselves.
 for ( my $index = 0 ; $index <= $#servers ; $index++ ) {
