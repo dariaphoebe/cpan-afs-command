@@ -14,6 +14,7 @@ all_from     q{lib/AFS/Command.pm};
 test_requires q{Test::Exception};
 
 requires q{Moose};
+requires q{MooseX::Singleton};
 requires q{Date::Format};
 requires q{Try::Tiny};
 
