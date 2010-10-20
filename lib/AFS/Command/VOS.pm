@@ -1,6 +1,7 @@
 package AFS::Command::VOS;
 
 use Moose;
+use MooseX::Singleton;
 use English;
 use Carp;
 

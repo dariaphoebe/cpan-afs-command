@@ -3,6 +3,7 @@ package AFS::Command::BOS;
 require 5.010;
 
 use Moose;
+use MooseX::Singleton;
 use English;
 use Carp;
 

@@ -1,6 +1,7 @@
 package AFS::Command::PTS;
 
 use Moose;
+use MooseX::Singleton;
 use English;
 use Carp;
 

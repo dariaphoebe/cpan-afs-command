@@ -47,8 +47,8 @@ sub debug {
 sub _build_command {
     my $self  = shift;
     my $class = ref $self;
-    my ($command) = reverse split m{\s+}msx, $class;
-    return $command;
+    my ($command) = reverse split m{::}ms, $class;
+    return lc($command);
 }
 
 sub _build__operations {
