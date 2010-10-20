@@ -38,7 +38,7 @@ class.  See that documentation for details.
 
 =head1 METHODS (wrapper methods)
 
-=head2 getpathinfo
+=head2 getPathInfo
 
 Exception handling when using the path methods can be very tedious.
 In many cases, you either want the AFS::Object::Path object for a
@@ -54,12 +54,12 @@ paths, you end up with code that looks like this:
 
 A simple wrapper method can be used to accomplish this, as follows:
 
-    my $pathobj = $fs->getpathinfo( method => q{listacl}, path => $path );
+    my $pathobj = $fs->getPathInfo( method => q{listacl}, path => $path );
 
-The getpathinfo method takes one additional key/value pair in addition
+The getPathInfo method takes one additional key/value pair in addition
 to the arguments of the method being wrapped, and that is the method
 being wrapped.  The rest of the arguments are passed to that method
-as-is.  However, getpathinfo can only be called for a single path.
+as-is.  However, getPathInfo can only be called for a single path.
 Passing an ARRAY reference will result in an exception.
 
 The return value is the AFS::Object::Path object for the given path.

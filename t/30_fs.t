@@ -114,23 +114,23 @@ foreach my $pathop ( keys %pathops ) {
 }
 
 throws_ok {
-    $fs->getpathinfo( path => $paths );
+    $fs->getPathInfo( path => $paths );
 } qr{Missing required argument: method}ms,
-    q{fs->getpathinfo raises exception when method missing};
+    q{fs->getPathInfo raises exception when method missing};
 
 throws_ok {
-    $fs->getpathinfo( method => q{listacl}, path => $paths );
+    $fs->getPathInfo( method => q{listacl}, path => $paths );
 } qr{Invalid argument: path is a reference}ms,
-    q{fs->getpathinfo raises exception when passed a ref};
+    q{fs->getPathInfo raises exception when passed a ref};
 
 throws_ok {
-    $fs->getpathinfo( method => q{listacl}, path => $pathnotafs );
+    $fs->getPathInfo( method => q{listacl}, path => $pathnotafs );
 } qr{Invalid argument}ms,
-    q{fs->getpathinfo raises exception when method fails};
+    q{fs->getPathInfo raises exception when method fails};
 
-my $pathinfo = $fs->getpathinfo( method => q{listacl}, path => $pathafs );
+my $pathinfo = $fs->getPathInfo( method => q{listacl}, path => $pathafs );
 ok( ref $pathinfo && $pathinfo->isa( q{AFS::Object::Path} ),
-    q{fs->getpathinfo returns correct object} );
+    q{fs->getPathInfo returns correct object} );
 
 # fs exportafs -- this one is hard to really test, since we can't
 # verify all the parsing unless it is actually supported and enabled,

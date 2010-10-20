@@ -17,7 +17,7 @@ use AFS::Object::Cell;
 use AFS::Object::Server;
 use AFS::Object::ACL;
 
-sub getpathinfo {
+sub getPathInfo {
 
     my $self = shift;
     my %args = @_;
