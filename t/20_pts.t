@@ -184,7 +184,7 @@ foreach my $name ( $ptsgroup, $ptsuser ) {
         nameorid => $name,
         cell     => $cell,
     );
-    ok( ref $result && $result->isa( q{AFS::Object::PTServer} ), q{pts-<membership} );
+    ok( ref $result && $result->isa( q{AFS::Object::PTServer} ), q{pts->membership} );
 
     my $type    = $name eq $ptsgroup ? q{Group} : q{User};
     my $class   = qq{AFS::Object::$type};

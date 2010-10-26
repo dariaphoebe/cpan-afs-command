@@ -15,21 +15,10 @@ use AFS::Object::Principal;
 use AFS::Object::Group;
 use AFS::Object::User;
 
-sub interactive {
-    return shift->_unsupported( q{interactive} );
-}
-
-sub sleep {
-    return shift->_unsupported( q{sleep} );
-}
-
-sub quit {
-    return shift->_unsupported( q{quit} );
-}
-
-sub source {
-    return shift->_unsupported( q{source} );
-}
+sub interactive { return shift->_unsupported( q{interactive} ); }
+sub sleep       { return shift->_unsupported( q{sleep}       ); }
+sub quit        { return shift->_unsupported( q{quit}        ); }
+sub source      { return shift->_unsupported( q{source}      ); }
 
 sub _unsupported {
     my $self = shift;
