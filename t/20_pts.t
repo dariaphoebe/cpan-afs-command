@@ -197,12 +197,26 @@ foreach my $name ( $ptsgroup, $ptsuser ) {
     ok( $#membership == 0, q{entry->getMembership} );
 
     if ( $name eq $ptsgroup ) {
-        ok( $membership[0] eq $ptsuser, q{correct membership} );
+        ok( $membership[0] eq $ptsuser, q{entry->getMembership correct membership} );
     } else {
-        ok( $membership[0] eq $ptsgroup, q{correct membership} );
+        ok( $membership[0] eq $ptsgroup, q{entry->getMembership correct membership} );
+    }
+
+    @membership = $pts->getMembership( nameorid => $name, cell => $cell );
+    ok( $#membership == 0, q{pts->getMembership} );
+
+    if ( $name eq $ptsgroup ) {
+        ok( $membership[0] eq $ptsuser, q{pts->getMembership correct membership} );
+    } else {
+        ok( $membership[0] eq $ptsgroup, q{pts->getMembership correct membership} );
     }
 
 }
+
+throws_ok {
+    $pts->getMembership( nameorid => [ $ptsgroup, $ptsuser ], cell => $cell );
+} qr{Invalid argument: nameorid is a reference}ms,
+    q{pts->getMembership raises exception when nameorid is a ref};
 
 ok( ! $pts->supportsArgument( q{membership}, q{supergroups} ),
     q{bos->membership support of supergroups suppressed} );

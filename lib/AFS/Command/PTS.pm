@@ -26,6 +26,25 @@ sub _unsupported {
     croak qq{Unsupported interactive pts operation: $operation};
 }
 
+sub getMembership {
+
+    my $self = shift;
+    my %args = @_;
+
+    if ( ref $args{nameorid} ) {
+        croak qq{Invalid argument: nameorid is a reference\n};
+    }
+
+    my $result = $self->membership( %args );
+
+    my ($object) = ( $result->getGroups, $result->getUsers );
+
+    return if not $object;
+
+    return $object->getMembership;
+
+}
+
 sub creategroup {
 
     my $self = shift;

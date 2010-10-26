@@ -58,6 +58,24 @@ class.  See that documentation for details.
 
 =back
 
+=head1 METHODS (wrapper methods)
+
+=head2 getMembership
+
+This method is a simple shorthand for querying the membership of a
+single user or group, which otherwise has to be done this way:
+
+    my $result = $pts->membership( nameorid => $name, cell => $cell );
+    my $nameobj = $result->getUserByName( $name ); # OR...
+    my $nameobj = $result->getGroupByName( $name ); # OR...
+    my @members = $nameobj->getMembership;
+
+This can be done with a single method call as follows:
+
+    my @members = $pts->getMembership( nameorid => $name, cell => $cell );
+
+If the value of nameorid is a reference, then an exception is raised.
+
 =head1 METHODS (with complex return values)
 
 =head2 creategroup
