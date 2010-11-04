@@ -26,6 +26,23 @@ sub _unsupported {
     croak qq{Unsupported interactive pts operation: $operation};
 }
 
+sub getEntry {
+
+    my $self = shift;
+    my %args = @_;
+
+    if ( ref $args{nameorid} ) {
+        croak qq{Invalid argument: nameorid is a reference\n};
+    }
+
+    my $result = $self->examine( %args );
+
+    my ($object) = ( $result->getGroups, $result->getUsers );
+
+    return $object;
+
+}
+
 sub getMembership {
 
     my $self = shift;
@@ -38,7 +55,7 @@ sub getMembership {
     my $result = $self->membership( %args );
 
     my ($object) = ( $result->getGroups, $result->getUsers );
-
+    
     return if not $object;
 
     return $object->getMembership;
@@ -119,8 +136,9 @@ sub examine {
     $self->operation( q{examine} );
 
     $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    $self->_exec_commands( stderr => q{stdout} );
+
+    my $missing = 0;
 
     while ( defined($_ = $self->_handle->getline) ) {
 
@@ -131,32 +149,52 @@ sub examine {
             chomp;
         }
 
-        my %data = ();
+        next if m{^\s*$}ms;
 
-        foreach my $field ( split m{,\s*}ms ) {
-            my ($key,$value) = split( m{:\s+}ms, $field, 2 );
-            $key =~ tr{A-Z}{a-z};
-            $key =~ s{\s+}{}gms;   # group quota -> groupquota
-            $value =~ s{\.$}{}ms;
-            $data{$key} = $value;
-        }
+        if ( m{User or group doesn.t exist}ms ) {
+            $missing++;
+        } elsif ( m{Name:}ms ) {
 
-        if ( not $data{id} ) {
-            croak qq{pts examine: Unrecognized output: '$_'};
-        }
+            my %data = ();
 
-        if ( $data{id} > 0 ) {
-            $result->_addUser( AFS::Object::User->new(%data) );
+            foreach my $field ( split m{,\s*}ms ) {
+                my ($key,$value) = split( m{:\s+}ms, $field, 2 );
+                $key =~ tr{A-Z}{a-z};
+                $key =~ s{\s+}{}gms; # group quota -> groupquota
+                $value =~ s{\.$}{}ms;
+                $data{$key} = $value;
+            }
+
+            if ( not $data{id} ) {
+                croak qq{pts examine: Unrecognized output: '$_'};
+            }
+
+            if ( $data{id} > 0 ) {
+                $result->_addUser( AFS::Object::User->new(%data) );
+            } else {
+                $result->_addGroup( AFS::Object::Group->new(%data) );
+            }
+
         } else {
-            $result->_addGroup( AFS::Object::Group->new(%data) );
+            $self->_errors( $self->_errors . $_ );
         }
 
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    if ( $self->_errors ) {
+        croak $self->_errors;
+    }
 
-    return $result;
+    if ( $result->getUsers or $result->getGroups ) {
+        $self->_reap_commands;
+        return $result;
+    } elsif ( $missing ) {
+        $self->_reap_commands( allowstatus => 1 );
+        return;
+    } else {
+        $self->_reap_commands;
+        return $result;
+    }
 
 }
 

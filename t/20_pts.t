@@ -132,6 +132,29 @@ foreach my $name ( $ptsgroup, $ptsuser ) {
 
 }
 
+throws_ok {
+    $pts->examine( nameorid => $ptsgroup, cell => q{nosuch} );
+} qr{Could not locate cell}ms,
+    q{pts->examine raises exception for bogus cell name};
+
+$result = $pts->examine( nameorid => [ $ptsgroup, q{nosuch} ], cell => $cell );
+ok( ref $result &&
+        $result->isa( q{AFS::Object::PTServer} ) &&
+            scalar $result->getGroups == 1, 
+    q{pts->examine handles a list of names correctly} );
+
+ok( ! $pts->examine( nameorid => q{nosuch}, cell => $cell ),
+    q{pts->examine returns false for a non-existent nameorid} );
+
+throws_ok {
+    $pts->getEntry( nameorid => [qw( a b )] );
+} qr{Invalid argument: nameorid is a reference}ms,
+    q{pts->getEntry raises exception when nameorid is a ref};
+
+$result = $pts->getEntry( nameorid => $ptsgroup );
+ok( ref $result && $result->isa( q{AFS::Object::Group} ),
+    q{pts->getEntry returns the correct object} );
+
 ok(
     $pts->chown(
         name  => $ptsgroup,
@@ -219,9 +242,9 @@ throws_ok {
     q{pts->getMembership raises exception when nameorid is a ref};
 
 ok( ! $pts->supportsArgument( q{membership}, q{supergroups} ),
-    q{bos->membership support of supergroups suppressed} );
+    q{pts->membership support of supergroups suppressed} );
 ok( ! $pts->supportsArgument( q{membership}, q{expandgroup} ),
-    q{bos->membership support of expandgroups suppressed} );
+    q{pts->membership support of expandgroups suppressed} );
 
 if ( $pts->supportsOperation( q{listentries} ) ) {
 
