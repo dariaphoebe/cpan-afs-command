@@ -1,7 +1,7 @@
 #
 # The name of the AFS cell in which the tests will be performed.
 #
-AFS_COMMAND_CELLNAME		= a.rp.nyc.us.test.efs
+AFS_COMMAND_CELLNAME		= a.rp.ny.us.test.efs
 
 #
 # This prefix will be used to create and remove a few volumes during
@@ -28,7 +28,7 @@ AFS_COMMAND_DBSERVER		= rpcore.test.efs
 # intrusive things, to test the FS API).  This directory must be in a
 # RW volume, and system:administrators must have write access to it.
 #
-AFS_COMMAND_PATHNAME_AFS	= /afs/a.rp.nyc.us.test.efs/tmp
+AFS_COMMAND_PATHNAME_AFS	= /afs/a.rp.ny.us.test.efs/tmp
 
 #
 # We will need to create a pts group and user, and if these names are
