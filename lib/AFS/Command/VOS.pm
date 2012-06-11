@@ -1,5 +1,8 @@
 package AFS::Command::VOS;
 
+our $VERSION = '2.000_001';
+$VERSION = eval $VERSION;  ##  no critic: StringyEval
+
 use Moose;
 use MooseX::Singleton;
 use English;
