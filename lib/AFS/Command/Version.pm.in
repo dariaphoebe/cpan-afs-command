@@ -1,0 +1,10 @@
+# NOTE: Do NOT use AFS::Command::Version as the package!!
+package AFS::Command;
+
+use strict;
+use warnings;
+
+our $VERSION = q{__VERSION__};
+$VERSION = eval $VERSION;  ##  no critic: StringyEval
+
+1;

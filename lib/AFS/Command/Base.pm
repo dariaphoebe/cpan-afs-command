@@ -2,9 +2,6 @@ package AFS::Command::Base;
 
 require 5.010;
 
-our $VERSION = '2.000_001';
-$VERSION = eval $VERSION;  ##  no critic: StringyEval
-
 use Moose;
 use English;
 use Carp;

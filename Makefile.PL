@@ -2,22 +2,61 @@ use strict;
 use warnings;
 use English;
 
-use inc::Module::Install;
+use ExtUtils::MakeMaker;
+use IO::File;
 
-name         q{AFS-Command};
-abstract     q{AFS Command Utility Interface};
-author       q{Phillip Moore <wpm@openefs.org>};
-perl_version q{5.010};
-license      q{unknown};
-all_from     q{lib/AFS/Command.pm};
+my $version = get_version(
+    in  => q{lib/AFS/Command/Version.pm.in},
+    out => q{lib/AFS/Command/Version.pm},
+);
 
-test_requires q{Test::Exception};
+WriteMakefile(
 
-requires q{Moose};
-requires q{MooseX::Singleton};
-requires q{Date::Format};
-requires q{Try::Tiny};
+    NAME             => q{AFS-Command},
+    MIN_PERL_VERSION => q{5.010},
+    VERSION          => $version,
+    ABSTRACT         => q{AFS Command Utility Interface},
+    AUTHOR           => q{Phillip Moore <wpm@openefs.org>},
+    LICENSE          => q{unknown},
 
-tests_recursive;
+    dist => {
+        TARFLAGS => q{-cv --exclude=.git -f},
+    },
 
-WriteAll;
+    PREREQ_PM => {
+        q{Moose}             => 0,
+        q{MooseX::Singleton} => 0,
+        q{Date::Format}      => 0,
+        q{Try::Tiny}         => 0,
+    },
+
+    TEST_REQUIRES => {
+        {Test::Exception} => 0,
+    },
+
+);
+
+sub get_version {
+
+    my %args = @_;
+
+    my $version = $ENV{EFSDEPLOY_RELEASEALIAS} || q{0.001_001};
+
+    my $in = IO::File->new( $args{in} ) ||
+        die qq{Unable to read $args{in}: $ERRNO\n};
+    my $out = IO::File->new( qq{>$args{out}} ) ||
+        die qq{Unable to write to $args{out}: $ERRNO\n};
+
+    while ( defined($_ = $in->getline) ) {
+        s{__VERSION__}{$version}ms;
+        $out->print( $_ );
+    }
+
+    STDOUT->print( qq{Set version to $version in $args{in}\n} );
+
+    $out->close || die qq{Unable to close $args{out}: $ERRNO\n};
+
+    return $version;
+
+}
+
