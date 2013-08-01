@@ -1,0 +1,15 @@
+.#*
+.*.sw?
+Makefile.old
+install.log
+META.*
+MYMETA.*
+Makefile
+MANIFEST
+*.tar.gz
+blib/
+failures.out
+inc/
+pm_to_blib
+tags
+lib/AFS/Command/Version.pm
