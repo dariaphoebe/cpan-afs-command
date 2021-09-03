@@ -16,7 +16,7 @@ WriteMakefile(
     MIN_PERL_VERSION => q{5.010},
     VERSION          => $version,
     ABSTRACT         => q{AFS Command Utility Interface},
-    AUTHOR           => q{Phillip Moore <wpm@openefs.org>},
+    AUTHOR           => q{Daria Phoebe Brashear <dariaphoebe@auristor.com>},
     LICENSE          => q{unknown},
 
     dist => {

@@ -80,9 +80,8 @@ found in the following documents:
 
 =head1 AUTHOR
 
-This code is a product of the demented mind of:
-
-    Phillip Moore <w.phillip.moore@gmail.com>
+This code is a product of the demented mind of Phillip Moore
+and is currently maintained by Daria Phoebe Brashear <dariaphoebe@auristor.com>
 
 Feedback, patches, recommendations, adulations, and even flames are
 all welcome.   Feed my ego (or try to shoot it down :-), please...
