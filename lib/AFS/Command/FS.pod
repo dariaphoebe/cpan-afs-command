@@ -7,15 +7,18 @@ AFS::Command::FS - OO API to the AFS fs command
 
     use AFS::Command::FS;
 
-    my $fs = AFS::Command::FS->new;
+    my $fs = AFS::Command::FS->new();
 
-    my $fs = AFS::Command::FS->new( command => $path_to_your_fs_binary );
+    my $fs = AFS::Command::FS->new
+      (
+       command			=> $path_to_your_fs_binary,
+      );
 
 =head1 DESCRIPTION
 
 This module implements an OO API wrapper around the AFS 'fs' command.
-The supported methods depend on the version of the fs binary used, and
-are determined automagically.
+The supported methods depend on the version of the fs binary used,
+and are determined automagically.
 
 =head1 METHODS -- Inherited
 
@@ -26,45 +29,17 @@ class.  See that documentation for details.
 
 =item new
 
+=item errors
+
 =item supportsOperation
 
 =item supportsArgument
 
-=item supportsArgumentRequired
-
-=item supportsArgumentOptional
-
 =back
 
-=head1 METHODS (wrapper methods)
+=head1 METHODS (with complex return values)
 
-=head2 getPathInfo
-
-Exception handling when using the path methods can be very tedious.
-In many cases, you either want the AFS::Object::Path object for a
-given path, or you want to raise an exception.  Due to the way the
-path command methods are implemented to support querying multiple
-paths, you end up with code that looks like this:
-
-    my $cm = $fs->listacl( path => $path );
-    my $pathobj = $cm->getPath( $path );
-    if ( $pathobj->error ) {
-        die qq{ARGHH!!!\n} . $pathobj->error;
-    }
-
-A simple wrapper method can be used to accomplish this, as follows:
-
-    my $pathobj = $fs->getPathInfo( method => q{listacl}, path => $path );
-
-The getPathInfo method takes one additional key/value pair in addition
-to the arguments of the method being wrapped, and that is the method
-being wrapped.  The rest of the arguments are passed to that method
-as-is.  However, getPathInfo can only be called for a single path.
-Passing an ARRAY reference will result in an exception.
-
-The return value is the AFS::Object::Path object for the given path.
-
-=head1 METHODS (path commands)
+=head2 NOTE: Error checking for commands that accept a list of paths
 
 A number of these methods accept a list of paths, and will return
 information for each path, individually.  If you specify a
@@ -87,21 +62,57 @@ attribute, and nothing else (no other data attributes, except the path
 itself).
 
 This holds true for the following API methods: diskfree, examine,
-getcalleraccess, getfid, listacl, listquota, quota, storebehind,
-whereis, and whichcell.
+listquota, quota, storebehind, whereis, whichcell, and listacl.
 
-All of these commands return an AFS::Object::CacheManager object,
-which contains one or more AFS::Object::Path objects, one for each
-path specified in the arguments.  Each of these objects has the
-following attributes and methods:
+=head2 checkservers
 
-B<AFS::Object::CacheManager>
+=over
 
-    Methods                     Returns
-    -------                     -------
-    getPathNames                list of strings, each of which is a single pathname
-    getPaths                    list of AFS::Object::Path objects, one for each path
-    getPath($pathname)          a single AFS::Object::Path object, for the pathname $pathname
+=item Arguments
+
+The fs help string is:
+
+    fs checkservers: check local cell's servers
+    Usage: fs checkservers [-cell <cell to check>] [-all] [-fast]
+			   [-interval <seconds between probes>]
+    Where: -all   check all cells
+	   -fast  just list, don't check
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->checkservers
+      (
+       # Optional arguments
+       cell			=> $cell,
+       interval			=> $interval,
+       all			=> 1,
+       fast			=> 1,
+      );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which
+contains one or more attributes.
+
+    my $result = $fs->checkservers() || die $fs->errors();
+    my @servers = $result->servers();
+    foreach my $server ( @servers ) {
+        print "Server $server appears to be down\n";
+    }
+
+The object has the following attributes:
+
+    Attributes			Values
+    ----------			------
+    servers			ARRAY reference of strings, each of which is
+				the hostname of a server which is down
+    interval			The value of the probe interval, in seconds
+
+Note that the interval attribute is only present of the internal
+argument was specified, and the servers list will be empty if nothing
+was down.
+
+=back
 
 =head2 diskfree
 
@@ -116,51 +127,63 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->diskfree(
+    my $result = $fs->diskfree
+      (
        # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
+       path			=> $path, # OR [ $path1, $path2, ... ]
+      );
 
 =item Return Values
 
-This method returns an AFS::Object::CacheManager object, which is
-documented above.
+This method returns an AFS::Object::CacheManager object, which
+contains one or more AFS::Object::Path objects, one for each path
+specified in the arguments.
 
-    my $result = $fs->diskfree(
-       path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            foreach my $attr ( qw( volname used total avail percent ) ) {
-                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
-            }
-        }
+    my $result = $fs->diskfree
+      (
+       path		=> [ $afspath, $ufspath, $boguspath ],
+      ) || die $fs->errors();
+    foreach my $pathobj ( $result->getPaths() ) {
+	my $path = $pathobj->path();
+	if ( $pathobj->hasAttribute('error') ) {
+	    print "Path '$path' has errors '" . $pathobj->error() . "'\n";
+	} else {
+	    foreach my $attr ( qw( volname used total avail percent ) ) {
+		print "Path '$path' has '$attr' of '" . $pathobj->$attr() . "'\n";
+	    }
+	}
     }
+
+Each of these objects has the following attributes and methods:
+
+B<AFS::Object::CacheManager>
+
+    Methods			Returns
+    -------			-------
+    getPathNames()		list of strings, each of which is a single pathname
+    getPaths()			list of AFS::Object::Path objects, one for each path
+    getPath($pathname)		a single AFS::Object::Path object, for the pathname $pathname
 
 B<AFS::Object::Path>
 
 If errors were encountered for any given path, then its object will
 have the following attributes:
 
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    error			The error string for that path
 
 If no errors were encountered, then the following attributes will be present:
 
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    volname                     The AFS volume name that contains the pathname
-    total                       The size (in KB) of the partition that contains 'volname'
-    used                        The amount of space (in KB) used on that partition
-    avail                       The amount of space (in KB) available on that partition
-    percent                     The amount of space used, as a percentage
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    volname			The AFS volume name that contains the pathname
+    total			The size (in KB) of the partition that contains 'volname'
+    used			The amount of space (in KB) used on that partition
+    avail			The amount of space (in KB) available on that partition
+    percent			The amount of space used, as a percentage
 
 =back
 
@@ -177,628 +200,64 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->examine(
+    my $result = $fs->examine
+      (
        # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which is
-documented above.
-
-    my $result = $fs->examine(
-       path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            foreach my $attr ( qw( id volname quota used avail total ) ) {
-                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
-            }
-        }
-    }
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    volname                     The AFS volume name that contains the pathname
-    id                          The numerical volume ID of the above volume
-    total                       The size (in KB) of the partition that contains 'volname'
-    used                        The amount of space (in KB) used on that partition
-    avail                       The amount of space (in KB) available on that partition
-    quota                       The quota of the volume (in KB), or 0 if set to "unlimited"
-
-=back
-
-=head2 getcalleraccess
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs getcalleraccess: list callers access 
-    Usage: fs getcalleraccess [-path <dir/file path>+]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->getcalleraccess(
-       # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which is documented above.
-
-    my $result = $fs->getcalleraccess(
-        path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            foreach my $attr ( qw( rights ) ) {
-                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
-            }
-        }
-    }
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    rights                      Caller's ACL rights on that path
-
-=back
-
-=head2 getfid
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs getcalleraccess: list callers access 
-    Usage: fs getcalleraccess [-path <dir/file path>+]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->getcalleraccess(
-       # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which is documented above.
-
-    my $result = $fs->getfid(
-        path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            foreach my $attr ( qw( rights ) ) {
-                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
-            }
-        }
-    }
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    volume                      The volume ID for that path
-    vnode                       The FID vnode for that path
-    unique                      The FID uniquifier for that path
-    cell                        The cell for that path[*]
-
-NOTE: The errors returned will almost always be "Unable to determine
-results".  As of OpenAFS 1.5.77, the getfid command returns no errors
-at all when it can not determine the FID, and the exit code is always
-zero.
-
-[*] This is only available in very recent versions of OpenAFS, since
-getfid was not modified to display the cell until late in 2010.  For a
-more reliable mechanism, use whichcell, which works with all existing
-fs binaries.
-
-=back
-
-=head2 listacl
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs listacl: list access control list
-    Usage: fs listacl [-path <dir/file path>+] [-id] [-if]
-    Where: -id  initial directory acl
-           -if  initial file acl
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->listacl(
-       # Required arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-       # Optional arguments
-       id   => 1,
-       if   => 1,
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which is
-documented above.
-
-    my $result = $fs->listacl(
-       path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            foreach my $type ( qw( normal negative ) ) {
-                my $acl = $pathobj->getACL($type);
-                my %entries = $acl->getEntries;
-                foreach my $principal ( keys %entries ) {
-                    my $rights = $acl->getRights($principal);
-                    print qq{$type rights for $principal are $rights\n};
-                }
-            }
-        }
-    }
-
-Each AFS::Object::Path object contains one or two AFS::Object::ACL
-objects (one for normal, and one for negative).
-
-B<AFS::Object::Path>
-
-    Methods                     Returns
-    -------                     -------
-    getACLNormal                the AFS::Object::ACL object for the normal rights
-    getACLNegative              the AFS::Object::ACL object for the negative rights
-    getACL($type)               the AFS::Object::ACL object for rights of type $type,
-                                where $type is either 'normal' or 'negative'
-
-B<AFS::Object::ACL>
-
-    Methods                     Returns
-    -------                     -------
-    getPrincipals               a list of the principals (users, groups) on the ACL
-    getRights($principal)       the rights (permissions) of the specified $principal
-    getEntries                  a list of key/value pairs, where the keys are the principals,
-                                and the values are the rights for that principal
-
-=back
-
-=head2 listquota
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs listquota: list volume quota
-    Usage: fs listquota [-path <dir/file path>+]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->listquota(
-       # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which is
-documented above.
-
-    my $result = $fs->listquota(
-       path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            foreach my $attr ( qw( volname quota used percent partition ) ) {
-                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
-            }
-        }
-    }
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    volname                     The AFS volume name that contains the pathname
-    quota                       Volume quota, in KB
-    used                        The amount of space (in KB) used in that volume
-    percent                     The percentage of the allocated quota in use
-    partition                   The percentage of space used on the partition where the volume resides
-
-=back
-
-=head2 quota
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs quota: show volume quota usage
-    Usage: fs quota [-path <dir/file path>+]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->quota(
-       # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which is
-documented above.
-
-    my $result = $fs->quota(
-       path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            print qq{Path '$path' has quota '} . $pathobj->quota . qq{'\n};
-        }
-    }
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    quota                       The percentage of the allocated quota in use
-
-=back
-
-=head2 storebehind
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs storebehind: store to server after file close
-    Usage: fs storebehind [-kbytes <asynchrony for specified names>]
-                          [-files <specific pathnames>+] [-allfiles <new default (KB)>]
-                          [-verbose]
-    Where: -verbose  show status
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->storebehind(
-       # Optional arguments
-       kbytes   => $kbytes,
-       files    => $file, # OR [ $file1, $file2, ... ]
-       allfiles => $default,
-       verbose  => 1,
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which is
-documented above.
-
-    my $result = $fs->quota(
-       path             => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            foreach my $attr ( qw( volname quota used percent partition ) ) {
-                print qq{Path '$path' has '$attr' of '} . $pathobj->$attr . qq{'\n};
-            }
-        }
-    }
-
-In addition to the usual methods available on the CacheManager object,
-the objects returned by this method will also have the following
-attribute as well:
-
-B<AFS::Object::CacheManager>
-
-    Attributes                  Values
-    ----------                  ------
-    asynchrony                  Default value (in KB) of asynchronous writes
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    asynchrony                  The number of KB of asynchronous writes for this file
-
-=back
-
-=head2 whereis
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs whereis: list file's location
-    Usage: fs whereis [-path <dir/file path>+]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->whereis(
-       # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which is
-documented above.
-
-    my $result = $fs->whereis(
-       path             => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            print qq{Path '$path' is on hosts } . join( q{ ,}, @{ $pathobj->hosts} ) . qq{\n};
-        }
-    }
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    hosts                       An ARRAY reference of hostnames
-
-=back
-
-=head2 whichcell
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs whichcell: list file's cell
-    Usage: fs whichcell [-path <dir/file path>+]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->whichcell(
-       # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object, which is
-documented above.
-
-    my $result = $fs->whichcell(
-       path => [ $afspath, $ufspath, $boguspath ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            print qq{Path '$path' is in cell '} . $pathobj->cell . qq{'\n};
-        }
-    }
-
-B<AFS::Object::Path>
-
-If errors were encountered for any given path, then its object will
-have the following attributes:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
-
-If no errors were encountered, then the following attributes will be present:
-
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    cell                        Cell in which the pathname lives
-
-=back
-
-=head1 METHODS (with complex return values)
-
-=head2 bypassthreshold
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs bypassthreshold: get/set cache bypass file size threshold 
-    Usage: fs bypassthreshold [-size <file size>]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->bypassthreshold(
-        # Optional arguments
-        size => $size,
-    );
-
-=item Return Values
-
-This method returns an AFS::Object::CacheManager object with one attribute.
-
-    Attributes                  Values
-    ----------                  ------
-    bypassthreshold             The value of the cache bypass threshold    
-
-Note that a value of -1 means disabled.
-
-=back
-
-=head2 checkservers
-
-=over
-
-=item Arguments
-
-The fs help string is:
-
-    fs checkservers: check local cell's servers
-    Usage: fs checkservers [-cell <cell to check>] [-all] [-fast]
-                           [-interval <seconds between probes>]
-    Where: -all   check all cells
-           -fast  just list, don't check
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->checkservers(
-       # Optional arguments
-       cell     => $cell,
-       interval => $interval,
-       all      => 1,
-       fast     => 1,
-    );
+       path			=> $path, # OR [ $path1, $path2, ... ]
+      );
 
 =item Return Values
 
 This method returns an AFS::Object::CacheManager object, which
-contains one or more attributes.
+contains one or more AFS::Object::Path objects, one for each path
+specified in the arguments.
 
-    my $result = $fs->checkservers;
-
-    foreach my $server ( $result->servers ) {
-        print qq{Server $server appears to be down\n};
+    my $result = $fs->examine
+      (
+       path		=> [ $afspath, $ufspath, $boguspath ],
+      ) || die $fs->errors();
+    foreach my $pathobj ( $result->getPaths() ) {
+	my $path = $pathobj->path();
+	if ( $pathobj->hasAttribute('error') ) {
+	    print "Path '$path' has errors '" . $pathobj->error() . "'\n";
+	} else {
+	    foreach my $attr ( qw( id volname quota used avail total ) ) {
+		print "Path '$path' has '$attr' of '" . $pathobj->$attr() . "'\n";
+	    }
+	}
     }
 
-The object has the following attributes:
+Each of these objects has the following attributes and methods:
 
-    Attributes                  Values
-    ----------                  ------
-    servers                     ARRAY reference of strings, each of which is
-                                the hostname of a server which is down
-    interval                    The value of the probe interval, in seconds
+B<AFS::Object::CacheManager>
 
-Note that the interval attribute is only present if the interval
-argument was specified, and the servers list will be empty if nothing
-was down.
+    Methods			Returns
+    -------			-------
+    getPathNames()		list of strings, each of which is a single pathname
+    getPaths()			list of AFS::Object::Path objects, one for each path
+    getPath($pathname)		a single AFS::Object::Path object, for the pathname $pathname
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    error			The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    volname			The AFS volume name that contains the pathname
+    id				The numerical volume ID of the above volume
+    total			The size (in KB) of the partition that contains 'volname'
+    used			The amount of space (in KB) used on that partition
+    avail			The amount of space (in KB) available on that partition
+    quota			The quota of the volume (in KB), or 0 if set to "unlimited"
 
 =back
 
@@ -812,21 +271,22 @@ The fs help string is:
 
     fs exportafs: enable/disable translators to AFS
     Usage: fs exportafs -type <exporter name> [-start <start/stop translator (on | off)>]
-                       [-convert <convert from afs to unix mode (on | off)>]
-                       [-uidcheck <run on strict 'uid check' mode (on | off)>]
-                       [-submounts <allow nfs mounts to subdirs of /afs/.. (on  | off)>]
+		       [-convert <convert from afs to unix mode (on | off)>]
+		       [-uidcheck <run on strict 'uid check' mode (on | off)>]
+		       [-submounts <allow nfs mounts to subdirs of /afs/.. (on  | off)>]
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->exportafs(
+    my $result = $fs->exportafs
+      (
        # Required arguments
-       type      => $type,       # 'nfs' is the only supported value
+       type			=> $type,	# 'nfs' is the only supported value
        # Optional arguments
-       start     => $start,      # 'on' or 'off'
-       convert   => $convert,    # 'on' or 'off'
-       uidcheck  => $uidcheck,   # 'on' or 'off'
-       submounts => $submounts,  # 'on' or 'off'
-    );
+       start			=> $start,	# 'on' or 'off'
+       convert			=> $convert,	# 'on' or 'off'
+       uidcheck			=> $uidcheck,	# 'on' or 'off'
+       submounts		=> $submounts,	# 'on' or 'off'
+      );
 
 NOTE: In a future release, the 4 optional arguments will probably take
 boolean values, with "off" being a special case that means false, in
@@ -837,25 +297,25 @@ order to simply the interface (and be backwards compatible).
 This method returns an AFS::Object::CacheManager object with one or
 more attributes.
 
-    my $result = $fs->exportafs(
-       type  => q{nfs},
-       start => q{on},
-    );
-
+    my $result = $fs->exportafs
+      (
+       type			=> 'nfs',
+       start			=> 'on',
+      ) || die $fs->errors();
     foreach my $attr ( qw( convert uidcheck submounts ) ) {
-        print qq{Translator has '$attr' set to '} . $result->$attr . qq{'\n};
+	print "Translator has '$attr' set to '" . $result->$attr() . "'\n";
     }
 
 The object has the following attribute:
 
 B<AFS::Object::CacheManager>
 
-    Attributes                  Values
-    ----------                  ------
-    enabled                     Boolean, true means the translator is on, false means off
-    convert                     Boolean, true means mode bits are converted from AFS to UNIX, false means off
-    uidcheck                    Boolean, true means strict uid checking mode is on, false means off
-    submounts                   Boolean, true means mounts of subdirs are allowed, false means disallowed
+    Attributes			Values
+    ----------			------
+    enabled			Boolean, true means the translator is on, false means off
+    convert			Boolean, true means mode bits are converted from AFS to UNIX, false means off
+    uidcheck			Boolean, true means strict uid checking mode is on, false means off
+    submounts			Boolean, true means mounts of subdirs are allowed, false means disallowed
 
 =back
 
@@ -872,26 +332,26 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->getcacheparms;
+    my $result = $fs->getcacheparms();
 
 =item Return Values
 
 This method returns an AFS::Object::CacheManager object with one or
 more attributes.
 
-    my $result = $fs->getcacheparms;
-    my $used = $result->used;
-    my $avail = $result->avail;
-    print qq{Cache is using $used KB of $avail KB available\n};
+    my $result = $fs->getcacheparms() || die $fs->errors();
+    my $used = $result->used();
+    my $avail = $result->avail();
+    print "Cache is using $used KB of $availa KB available\n";
 
 The object has the following attributes:
 
 B<AFS::Object::CacheManager>
 
-    Attributes                  Values
-    ----------                  ------
-    used                        Number of KB of the AFS cache in use
-    avail                       Size of the AFS cache, in KB
+    Attributes			Values
+    ----------			------
+    used			Number of KB of the AFS cache in use
+    avail			Size of the AFS cache, in KB
 
 =back
 
@@ -908,46 +368,47 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->getcellstatus(
+    my $result = $fs->getcellstatus
+      (
        # Required arguments
-       cell => $cell, # OR [ $cell1, $cell2, ... ]
-    );
+       cell			-> $cell, # OR [ $cell1, $cell2, ... ]
+      );
 
 =item Return Values
 
 This method returns an AFS::Object::CacheManager object which contains
 one or more AFS::Object::Cell objects.
 
-    my $result = $fs->getcellstatus(
-       cell => [ $cell1 , $cell2 ],
-    );
-
-    foreach my $cellobj ( $result->getCells ) {
-        my $cell = $cellobj->cell;
-        if ( $cellobj->status ) {
-            print qq{This client allows setuid binaries from cell '$cell'\n};
-        } else {
-            print qq{This client does NOT allow setuid binaries from cell '$cell'\n};
-        }
+    my $result = $fs->getcellstatus
+      (
+       cell			=> [ $cell1 , $cell2 ],
+      ) || die $fs->errors();
+    foreach my $cellobj ( $result->getCells() ) {
+	my $cell = $cellobj->cell();
+	if ( $cellobj->status() ) {
+	    print("This client allows setuid binaries from cell '$cell'\n";
+	} else {
+	    print("This client does NOT allow setuid binaries from cell '$cell'\n";
+	}
     }
 
 The objects have the following attributes and methods:
 
 B<AFS::Object::CacheManager>
 
-    Methods                     Returns
-    -------                     -------
-    getCellNames                list of cell names
-    getCells                    list of AFS::Object::Cell objects
-    getCell($cell)              the AFS::Object::Cell object for cell $cell
+    Methods			Returns
+    -------			-------
+    getCellNames()		list of cell names
+    getCells()			list of AFS::Object::Cell objects
+    getCell($cell)		the AFS::Object::Cell object for cell $cell
 
 B<AFS::Object::Cell>
 
-    Attributes                  Values
-    ----------                  ------
-    cell                        AFS cell name
-    status                      Boolean, true indicating setuid/gid bits are allowed,
-                                false indicating they are not
+    Attributes			Values
+    ----------			------
+    cell			AFS cell name
+    status			Boolean, true indicating setuid/gid bits are allowed,
+				false indicating they are not
 
 =back
 
@@ -964,26 +425,25 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->getclientaddrs;
+    my $result = $fs->getclientaddrs();
 
 =item Return Values
 
 This method returns an AFS::Object::CacheManager object with one attribute.
 
-    my $result = $fs->getclientaddrs;
-
-    print qq{This client has the following addressed configured for AFS:\n};
-    foreach my $address ( @{$result->addresses} ) {
-        print qq{\t$address\n};
+    my $result = $fs->getclientaddrs() || die $fs->errors();
+    print "This client has the following addressed configured for AFS:\n";
+    foreach my $address ( @{$result->addresses()} ) {
+	print "\t$address\n";
     }
 
 The object has the following attribute:
 
 B<AFS::Object::CacheManager>
 
-    Attributes                  Values
-    ----------                  ------
-    addresses                   ARRAY reference of IP addresses
+    Attributes			Values
+    ----------			------
+    addresses			ARRAY reference of IP addresses
 
 =back
 
@@ -1000,22 +460,22 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->getcrypt;
+    my $result = $fs->getcrypt();
 
 =item Return Values
 
 This method returns an AFS::Object::CacheManager object with one attribute.
 
-    my $result = $fs->getcrypt
-    print qq{This client has encryption turned } . ( $result->crypt ? q{on} : q{off} ) . qq{\n};
+    my $result = $fs->getcrypt() || die $fs->errors();
+    print "This client has encryption turned " . ( $result->crypt() ? "on" : "off" ) . "\n";
 
 The object has the following attribute:
 
 B<AFS::Object::CacheManager>
 
-    Attributes                  Values
-    ----------                  ------
-    crypt                       Boolean, indicating whether or not encryption is enabled
+    Attributes			Values
+    ----------			------
+    crypt			Boolean, indicating whether or not encryption is enabled
 
 =back
 
@@ -1030,46 +490,128 @@ The fs help string is:
     fs getserverprefs: get server ranks
     Usage: fs getserverprefs [-file <output to named file>] [-numeric] [-vlservers]
     Where: -numeric    addresses only
-           -vlservers  VL servers
+	   -vlservers  VL servers
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->getserverprefs(
+    my $result = $fs->getserverprefs
+      (
        # Optional arguments
-       file      => $file,
-       numeric   => 1,
-       vlservers => 1,
-    );
+       file			=> $file,
+       numeric			=> 1,
+       vlservers		=> 1,
+      );
 
 =item Return Values
 
 This method returns an AFS::Object::CacheManager object which contains
 one or more AFS::Object::Server objects.
 
-    my $result = $fs->getserverprefs;
-
-    foreach my $serverobj ( $result->getServers ) {
-        my $server = $serverobj->server;
-        my $pref = $serverobj->preference;
-        print qq{Server '$server' has preference '$preference'\n};
+    my $result = $fs->getserverprefs() || die $fs->errors();
+    foreach my $serverobj ( $result->getServers() ) {
+	my $server = $serverobj->server();
+	my $pref = $serverobj->preference();
+	print "Server '$server' has preference '$preference'\n";
     }
 
 The objects have the following attributes and methods:
 
 B<AFS::Object::CacheManager>
 
-    Methods                     Returns
-    -------                     -------
-    getServerNames              list of server hostnames (or addresses)
-    getServers                  list of AFS::Object::Server objects
-    getServer($server)          the AFS::Object::Server object for server $server
+    Methods			Returns
+    -------			-------
+    getServerNames()		list of server hostnames (or addresses)
+    getServers()		list of AFS::Object::Server objects
+    getServer($server)		the AFS::Object::Server object for server $server
 
 B<AFS::Object::Server>
 
-    Attributes                  Values
-    ----------                  ------
-    server                      Hostname or IP address of the server
-    preference                  Numeric preference value
+    Attributes			Values
+    ----------			------
+    server			Hostname or IP address of the server
+    preference			Numeric preference value
+
+=back
+
+=head2 listacl
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs listacl: list access control list
+    Usage: fs listacl [-path <dir/file path>+] [-id] [-if]
+    Where: -id  initial directory acl
+	   -if  initial file acl
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->listacl
+      (
+       # Required arguments
+       path			=> $path, # OR [ $path1, $path2, ... ]
+       # Optional arguments
+       id			=> 1,
+       if			=> 1,
+      );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which
+contains one or more AFS::Object::Path objects, one for each path
+specified in the arguments.  Each AFS::Object::Path object contains
+one or two AFS::Object::ACL objects (one for normal, and one for
+negative).
+
+    my $result = $fs->listacl
+      (
+       path		=> [ $afspath, $ufspath, $boguspath ],
+      ) || die $fs->errors();
+    foreach my $pathobj ( $result->getPaths() ) {
+	my $path = $pathobj->path();
+	if ( $pathobj->hasAttribute('error') ) {
+	    print "Path '$path' has errors '" . $pathobj->error() . "'\n";
+	} else {
+	    foreach my $type ( qw( normal negative ) ) {
+		my $acl = $pathobj->getACL($type);
+		my %entries = $acl->getEntries();
+		foreach my $principal ( keys %entries ) {
+		    my $rights = $acl->getRights($principal);
+		    print "$type rights for $principal are $rights\n";
+		}
+	    }
+	}
+    }
+
+The objects have the following attributes and methods:
+
+B<AFS::Object::CacheManager>
+
+    Methods			Returns
+    -------			-------
+    getPathNames()		list of strings, each of which is a single pathname
+    getPaths()			list of AFS::Object::Path objects, one for each path
+    getPath($pathname)		a single AFS::Object::Path object, for the pathname $pathname
+
+B<AFS::Object::Path>
+
+    Methods			Returns
+    -------			-------
+    getACLNormal()		the AFS::Object::ACL object for the normal rights
+    getACLNegative()		the AFS::Object::ACL object for the negative rights
+    getACL($type)		the AFS::Object::ACL object for rights of type $type,
+				where $type is either 'normal' or 'negative'
+
+B<AFS::Object::ACL>
+
+    Methods			Returns
+    -------			-------
+    getPrincipals()		a list of the principals (users, groups) on the ACL
+    getRights($principal)	the rights (permissions) of the specified $principal
+    getEntries()		a list of key/value pairs, where the keys are the principals,
+				and the values are the rights for that principal
 
 =back
 
@@ -1086,37 +628,36 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->listaliases;
+    my $result = $fs->listaliases();
 
 =item Return Values
 
 This method returns an AFS::Object::CacheManager object, which
 contains one or more AFS::Object::Cell objects.
 
-    my $result = $fs->listaliases;
-
-    foreach my $cellobj ( $result->getCells ) {
-        my $cell = $cellobj->cell;
-        my $alias = $cellobj->alias;
-        print qq{Cell '$cell' has alias '$alias'\n};
+    my $result = $fs->listaliases() || die $fs->errors();
+    foreach my $cellobj ( $result->getCells() ) {
+	my $cell = $cellobj->cell();
+	my $alias = $cellobj->alias();
+	print "Cell '$cell' has alias '$alias'\n";
     }
 
 The objects have the following attributes and methods:
 
 B<AFS::Object::CacheManager>
 
-    Methods                     Returns
-    -------                     -------
-    getCellNames                list of cell names
-    getCells                    list of AFS::Object::Cell objects
-    getCell($cell)              the AFS::Object::Cell object for cell $cell
+    Methods			Returns
+    -------			-------
+    getCellNames()		list of cell names
+    getCells()			list of AFS::Object::Cell objects
+    getCell($cell)		the AFS::Object::Cell object for cell $cell
 
 B<AFS::Object::Cell>
 
-    Attributes                  Values
-    ----------                  ------
-    cell                        AFS cell name
-    alias                       Alias name for this cell
+    Attributes			Values
+    ----------			------
+    cell			AFS cell name
+    alias			Alias name for this cell
 
 =back
 
@@ -1134,42 +675,115 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->listcells(
+    my $result = $fs->listcells
+      (
        # Optional arguments
-       numeric => 1,
-    );
+       numeric			=> 1,
+      );
 
 =item Return Values
 
 This method returns an AFS::Object::CacheManager object, which
 contains one or more AFS::Object::Cell objects.
 
-    my $result = $fs->listcells;
-
-    foreach my $cellobj ( $result->getCells ) {
-        my $servers = $cellobj->servers;
-        print qq{Cell $cell has servers } . join( q{ }, @{$servers} ) . qq{\n};
+    my $result = $fs->listcells() || die $fs->errors();
+    foreach my $cellobj ( $result->getCells() ) {
+	my $servers = $cellobj->servers();
+	print "Cell $cell has servers " . join(" ",@$servers) . "\n";
     }
 
 The objects have the following attributes and methods:
 
 B<AFS::Object::CacheManager>
 
-    Methods                     Returns
-    -------                     -------
-    getCellNames                list of cell names
-    getCells                    list of AFS::Object::Cell objects
-    getCell($cell)              the AFS::Object::Cell object for cell $cell
+    Methods			Returns
+    -------			-------
+    getCellNames()		list of cell names
+    getCells()			list of AFS::Object::Cell objects
+    getCell($cell)		the AFS::Object::Cell object for cell $cell
 
 B<AFS::Object::Cell>
 
-    Attributes                  Values
-    ----------                  ------
-    cell                        AFS cell name
-    servers                     ARRAY reference of strings, each of which is
-                                the hostname of a server
+    Attributes			Values
+    ----------			------
+    cell			AFS cell name
+    servers			ARRAY reference of strings, each of which is
+				the hostname of a server
 
 =back
+
+=head2 listquota
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs listquota: list volume quota
+    Usage: fs listquota [-path <dir/file path>+]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->listquota
+      (
+       # Optional arguments
+       path			=> $path, # OR [ $path1, $path2, ... ]
+      );
+
+=item Return Values
+
+=back
+
+This method returns an AFS::Object::CacheManager object, which
+contains one or more AFS::Object::Path objects, one for each path
+specified in the arguments.
+
+    my $result = $fs->listquota
+      (
+       path		=> [ $afspath, $ufspath, $boguspath ],
+      ) || die $fs->errors();
+    foreach my $pathobj ( $result->getPaths() ) {
+	my $path = $pathobj->path();
+	if ( $pathobj->hasAttribute('error') ) {
+	    print "Path '$path' has errors '" . $pathobj->error() . "'\n";
+	} else {
+	    foreach my $attr ( qw( volname quota used percent partition ) ) {
+		print "Path '$path' has '$attr' of '" . $pathobj->$attr() . "'\n";
+	    }
+	}
+    }
+
+Each of these objects has the following attributes and methods:
+
+B<AFS::Object::CacheManager>
+
+    Methods			Returns
+    -------			-------
+    getPathNames()		list of strings, each of which is a single pathname
+    getPaths()			list of AFS::Object::Path objects, one for each path
+    getPath($pathname)		a single AFS::Object::Path object, for the pathname $pathname
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    error			The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    volname			The AFS volume name that contains the pathname
+    quota			Volume quota, in KB
+    used			The amount of space (in KB) used in that volume
+    percent			The percentage of the allocated quota in use
+    partition			The percentage of space used on the partition where the volume resides
 
 =head2 lsmount
 
@@ -1184,10 +798,11 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->lsmount(
+    my $result = $fs->lsmount
+      (
        # Required arguments
-       dir => $dir, # OR [ $dir1, $dir2, ... ]
-    );
+       dir			=> $dir, # OR [ $dir1, $dir2, ... ]
+      );
 
 =item Return Values
 
@@ -1195,59 +810,203 @@ This method returns an AFS::Object::CacheManager object, which
 contains one or more AFS::Object::Path objects, one for each path
 specified in the arguments.
 
-    my $result = $fs->lsmount(
-       dir => [ $dir1, $dir2 ],
-    );
-
-    foreach my $pathobj ( $result->getPaths ) {
-        my $path = $pathobj->path;
-        if ( $pathobj->hasAttribute( q{error} ) ) {
-            print qq{Path '$path' has errors '} . $pathobj->error . qq{'\n};
-        } else {
-            my $volname = $pathobj->volname;
-            my $cell = $pathobj->cell;
-            print(
-                qq{Path '$path' is a mtpt for volume $volname} .
-                  ( $cell ? qq{, in cell '$cell'\n} : qq{\n} )
-            );
-        }
+    my $result = $fs->lsmount
+      (
+       dir			=> [ $dir1, $dir2 ],
+      ) || die $fs->errors();
+    foreach my $pathobj ( $result->getPaths() ) {
+	my $path = $pathobj->path();
+	if ( $pathobj->hasAttribute('error') ) {
+	    print "Path '$path' has errors '" . $pathobj->error() . "'\n";
+	} else {
+            my $volname = $pathobj->volname();
+            my $cell = $pathobj->cell();
+            print("Path '$path' is a mtpt for volume $volname" .
+                  ( $cell ? ", in cell '$cell'\n" : "\n" ));
+	}
     }
 
 Each of these objects has the following attributes and methods:
 
 B<AFS::Object::CacheManager>
 
-    Methods                     Returns
-    -------                     -------
-    getPathNames                list of strings, each of which is a single pathname
-    getPaths                    list of AFS::Object::Path objects, one for each path
-    getPath($pathname)          a single AFS::Object::Path object, for the pathname $pathname
+    Methods			Returns
+    -------			-------
+    getPathNames()		list of strings, each of which is a single pathname
+    getPaths()			list of AFS::Object::Path objects, one for each path
+    getPath($pathname)		a single AFS::Object::Path object, for the pathname $pathname
 
 B<AFS::Object::Path>
 
 If errors were encountered for any given path, then its object will
 have the following attributes:
 
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    error                       The error string for that path
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    error			The error string for that path
 
 If no errors were encountered, then the following attributes will
 always be present:
 
-    Attributes                  Values
-    ----------                  ------
-    path                        The pathname
-    volname                     AFS volname in the mount point
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    volname			AFS volname in the mount point
 
 The following attributes may or may not be present:
 
-    Attributes                  Values
-    ----------                  ------
-    symlink                     Boolean, true if the pathname is a symlink to a mount point
-    readwrite                   Boolean, true if the mount point is explicitly readwrite
-    cell                        AFS cell name in the mount point
+    Attributes			Values
+    ----------			------
+    symlink			Boolean, true if the pathname is a symlink to a mount point
+    readwrite			Boolean, true if the mount point is explicitly readwrite
+    cell			AFS cell name in the mount point
+
+=back
+
+=head2 quota
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs quota: show volume quota usage
+    Usage: fs quota [-path <dir/file path>+]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->quota
+      (
+       # Optional arguments
+       path			=> $path, # OR [ $path1, $path2, ... ]
+      );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which
+contains one or more AFS::Object::Path objects, one for each path
+specified in the arguments.
+
+    my $result = $fs->quota
+      (
+       path		=> [ $afspath, $ufspath, $boguspath ],
+      ) || die $fs->errors();
+    foreach my $pathobj ( $result->getPaths() ) {
+	my $path = $pathobj->path();
+	if ( $pathobj->hasAttribute('error') ) {
+	    print "Path '$path' has errors '" . $pathobj->error() . "'\n";
+	} else {
+            print "Path '$path' has quota '" . $pathobj->quota() . "'\n";
+	}
+    }
+
+Each of these objects has the following attributes and methods:
+
+B<AFS::Object::CacheManager>
+
+    Methods			Returns
+    -------			-------
+    getPathNames()		list of strings, each of which is a single pathname
+    getPaths()			list of AFS::Object::Path objects, one for each path
+    getPath($pathname)		a single AFS::Object::Path object, for the pathname $pathname
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    error			The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    quota			The percentage of the allocated quota in use
+
+=back
+
+=head2 storebehind
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs storebehind: store to server after file close
+    Usage: fs storebehind [-kbytes <asynchrony for specified names>]
+			  [-files <specific pathnames>+] [-allfiles <new default (KB)>]
+			  [-verbose]
+    Where: -verbose  show status
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->storebehind
+      (
+       # Optional arguments
+       kbytes			=> $kbytes,
+       files			=> $file, # OR [ $file1, $file2, ... ]
+       allfiles			=> $default,
+       verbose			=> 1,
+      );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which
+contains one or more AFS::Object::Path objects, one for each path
+specified in the arguments.
+
+    my $result = $fs->quota
+      (
+       path		=> [ $afspath, $ufspath, $boguspath ],
+      ) || die $fs->errors();
+    foreach my $pathobj ( $result->getPaths() ) {
+	my $path = $pathobj->path();
+	if ( $pathobj->hasAttribute('error') ) {
+	    print "Path '$path' has errors '" . $pathobj->error() . "'\n";
+	} else {
+	    foreach my $attr ( qw( volname quota used percent partition ) ) {
+		print "Path '$path' has '$attr' of '" . $pathobj->$attr() . "'\n";
+	    }
+	}
+    }
+
+Each of these objects has the following attributes and methods:
+
+B<AFS::Object::CacheManager>
+
+    Attributes			Values
+    ----------			------
+    asynchrony			Default value (in KB) of asynchronous writes
+
+    Methods			Returns
+    -------			-------
+    getPathNames()		list of strings, each of which is a single pathname
+    getPaths()			list of AFS::Object::Path objects, one for each path
+    getPath($pathname)		a single AFS::Object::Path object, for the pathname $pathname
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    error			The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    asynchrony			The number of KB of asynchronous writes for this file
 
 =back
 
@@ -1264,39 +1023,40 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->sysname(
+    my $result = $fs->sysname
+      (
        # Optional arguments
-       newsys => $sysname, # OR [ $sysname1, $sysname2, ... ]
-    );
+       newsys			=> $sysname, # OR [ $sysname1, $sysname2, ... ]
+      );
 
 =item Return Values
 
 This method returns an AFS::Object::CacheManager object which has one
 of two possible attributes.
 
-    my $result = $fs->sysname;
-    my $sysname = $result->sysname;
-    my $sysnames = $result->sysnames;
-    print qq{This client has a primary sysname of '$sysname'\n};
-    if ( ref $sysnames eq q{ARRAY} ) {
-        print qq{This client has a list of sysnames: } . join( q{ ,}, @{ $sysnames } ) . qq{\n};
+    my $result = $fs->sysname() || die $fs->errors();
+    my $sysname = $result->sysname();
+    my $sysnames = $result->sysnames();
+    print "This client has a primary sysname of '$sysname'\n";
+    if ( ref $sysnames eq 'ARRAY' ) {
+	print "This client has a list of sysnames: " . join(" ,",@$sysnames) . "\n";
     }
 
 The object has the following attributes:
 
 B<AFS::Object::CacheManager>
 
-    Attributes                  Values
-    ----------                  ------
-    sysname                     The primary sysname of the client
-    sysnames                    An ARRAY reference of sysnames
+    Attributes			Values
+    ----------			------
+    sysname			The primary sysname of the client
+    sysnames			An ARRAY reference of sysnames
 
 NOTE: When a list of sysnames has been configured on the client, then
 the 'sysname' attribute is simnply the first one in the list.
 
 =back
 
-=head2 uuid
+=head2 whereis
 
 =over
 
@@ -1304,50 +1064,129 @@ the 'sysname' attribute is simnply the first one in the list.
 
 The fs help string is:
 
-    fs uuid: manage the UUID for the cache manager 
-    Usage: fs uuid -generate
+    fs whereis: list file's location
+    Usage: fs whereis [-path <dir/file path>+]
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->uuid(
-        # Optional argument (see below)
-        generate => 1, 
-    );
-
-NOTE: The -generate option is optional only for OpenAFS versions 1.5.8
-or newer, and the uuid command was only introduced in OpenAFS 1.4.5.
-For versions prior to 1.5.8, this command will return a true/false
-value, but for 1.5.8 and beyond, it return an object containing the
-uuid value.
+    my $result = $fs->whereis
+      (
+       # Optional arguments
+       path			=> $path, # OR [ $path1, $path2, ... ]
+      );
 
 =item Return Values
 
-The return value for this method depends on the version of the fs
-command being used.  See above for the version details.  If the fs
-command returns the uuid, then this method returns an
-AFS::Object::CacheManager object which has one attribute.
+This method returns an AFS::Object::CacheManager object, which
+contains one or more AFS::Object::Path objects, one for each path
+specified in the arguments.
 
-    Attributes                  Values
-    ----------                  ------
-    uuid                        The UUID of the AFS client
+    my $result = $fs->whereis
+      (
+       path		=> [ $afspath, $ufspath, $boguspath ],
+      ) || die $fs->errors();
+    foreach my $pathobj ( $result->getPaths() ) {
+	my $path = $pathobj->path();
+	if ( $pathobj->hasAttribute('error') ) {
+	    print "Path '$path' has errors '" . $pathobj->error() . "'\n";
+	} else {
+            print "Path '$path' is on hosts " . join(" ,",@{pathobj->hosts()}) . "\n";
+	}
+    }
 
-If the fs command does B<NOT> return the uuid, then this method simply
-returns a true/false value, not an object.  This can be handled
-programmatically as follows:
+Each of these objects has the following attributes and methods:
 
-    if ( $fs->supportsOperation( q{uuid} ) {
-        if ( $fs->supportsArgumentRequired( qw( uuid generate ) ) {
-            $fs->uuid( generate => 1 );
-        } else {
-            my $result = $fs->uuid;
-            my $old_uuid = $result->uuid;
-            $result = $fs->uuid( generate => 1 );
-            my $new_uuid = $result->uuid;
-            warn qq{UUID changed from $old_uuid to $new_uuid\n};
-        }
-    } else {
-        die qq{Unable to set the uuid\n};
-    } 
+B<AFS::Object::CacheManager>
+
+    Methods			Returns
+    -------			-------
+    getPathNames()		list of strings, each of which is a single pathname
+    getPaths()			list of AFS::Object::Path objects, one for each path
+    getPath($pathname)		a single AFS::Object::Path object, for the pathname $pathname
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    error			The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    hosts			An ARRAY reference of hostnames
+
+=back
+
+=head2 whichcell
+
+=over
+
+=item Arguments
+
+The fs help string is:
+
+    fs whichcell: list file's cell
+    Usage: fs whichcell [-path <dir/file path>+]
+
+The corresponding method invocation looks like:
+
+    my $result = $fs->whichcell
+      (
+       # Optional arguments
+       path			=> $path, # OR [ $path1, $path2, ... ]
+      );
+
+=item Return Values
+
+This method returns an AFS::Object::CacheManager object, which
+contains one or more AFS::Object::Path objects, one for each path
+specified in the arguments.
+
+    my $result = $fs->whichcell
+      (
+       path		=> [ $afspath, $ufspath, $boguspath ],
+      ) || die $fs->errors();
+    foreach my $pathobj ( $result->getPaths() ) {
+	my $path = $pathobj->path();
+	if ( $pathobj->hasAttribute('error') ) {
+	    print "Path '$path' has errors '" . $pathobj->error() . "'\n";
+	} else {
+            print "Path '$path' is in cell '" . $pathobj->cell() . "'\n";
+	}
+    }
+
+Each of these objects has the following attributes and methods:
+
+B<AFS::Object::CacheManager>
+
+    Methods			Returns
+    -------			-------
+    getPathNames()		list of strings, each of which is a single pathname
+    getPaths()			list of AFS::Object::Path objects, one for each path
+    getPath($pathname)		a single AFS::Object::Path object, for the pathname $pathname
+
+B<AFS::Object::Path>
+
+If errors were encountered for any given path, then its object will
+have the following attributes:
+
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    error			The error string for that path
+
+If no errors were encountered, then the following attributes will be present:
+
+    Attributes			Values
+    ----------			------
+    path			The pathname
+    cell			Cell in which the pathname lives
 
 =back
 
@@ -1364,21 +1203,21 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->wscell;
+    my $result = $fs->wscell();
 
 =item Return Values
 
 This method returns an AFS::Object::CacheManager object which has one
 attribute.
 
-    my $result = $fs->wscell;
-    print qq{This client lives in cell '} . $result->cell . qq{'\n};
+    my $result = $fs->wscell() || die $fs->errors();
+    print "This client lives in cell '" . $result->cell() . "'\n";
 
 The object has the following attribute:
 
-    Attributes                  Values
-    ----------                  ------
-    cell                        The AFS cell of the client
+    Attributes			Values
+    ----------			------
+    cell			The AFS cell of the client
 
 =back
 
@@ -1393,7 +1232,7 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->checkvolumes;
+    my $result = $fs->checkvolumes();
 
 =head2 cleanacl
 
@@ -1404,10 +1243,11 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->cleanacl(
+    my $result = $fs->cleanacl
+      (
        # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
+       path			=> $path, # OR [ $path1, $path2, ... ]
+      );
 
 =head2 copyacl
 
@@ -1415,42 +1255,24 @@ The fs help string is:
 
     fs copyacl: copy access control list
     Usage: fs copyacl -fromdir <source directory (or DFS file)>
-                      -todir <destination directory (or DFS file)>+
-                      [-clear] [-id] [-if]
+		      -todir <destination directory (or DFS file)>+
+		      [-clear] [-id] [-if]
     Where: -clear  first clear dest access list
-           -id     initial directory acl
-           -if     initial file acl
+	   -id     initial directory acl
+	   -if     initial file acl
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->copyacl(
+    my $result = $fs->copyacl
+      (
        # Required arguments
-       fromdir => $fromdir,
-       todir   => $todir, # OR [ $todir1, $todir2, ... ]
+       fromdir			=> $fromdir,
+       todir			=> $todir, # OR [ $todir1, $todir2, ... ]
        # Optional arguments
-       clear   => 1,
-       id      => 1,
-       if      => 1,
-    );
-
-=head2 discon
-
-The fs help string is:
-
-    fs discon: disconnection mode 
-    Usage: fs discon -mode <offline | online> [-policy <client | server>]
-                     [-force] [-uid <Numeric UID of user whose tokens to use at reconnect.>]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->discon(
-        # Required arguments
-        mode   => $mode,
-        # Optional arguments
-        policy => $policy,
-        force  => 1,
-        uid    => $uid,
-    );
+       clear			=> 1,
+       id			=> 1,
+       if			=> 1,
+      );
 
 =head2 flush
 
@@ -1461,10 +1283,11 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->flush(
+    my $result = $fs->flush
+      (
        # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
+       path			=> $path, # OR [ $path1, $path2, ... ]
+      );
 
 =head2 flushmount
 
@@ -1475,10 +1298,11 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->flushmount(
+    my $result = $fs->flushmount
+      (
        # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
+       path			=> $path, # OR [ $path1, $path2, ... ]
+      );
 
 =head2 flushvolume
 
@@ -1489,10 +1313,11 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->flushvolume(
+    my $result = $fs->flushvolume
+      (
        # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
+       path			=> $path, # OR [ $path1, $path2, ... ]
+      );
 
 =head2 messages
 
@@ -1503,10 +1328,11 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->messages(
+    my $result = $fs->messages
+      (
        # Optional arguments
-       show => $show,
-    );
+       show			=> $show,
+      );
 
 =head2 mkmount
 
@@ -1515,19 +1341,20 @@ The fs help string is:
     fs mkmount: make mount point
     Usage: fs mkmount -dir <directory> -vol <volume name> [-cell <cell name>] [-rw] [-fast]
     Where: -rw    force r/w volume
-           -fast  don't check name with VLDB
+	   -fast  don't check name with VLDB
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->mkmount(
+    my $result = $fs->mkmount
+      (
        # Required arguments
-       dir  => $dir,
-       vol  => $vol,
+       dir			=> $dir,
+       vol			=> $vol,
        # Optional arguments
-       cell => $cell,
-       rw   => 1,
-       fast => 1,
-    );
+       cell			=> $cell,
+       rw			=> 1,
+       fast			=> 1,
+      );
 
 =head2 newalias
 
@@ -1538,11 +1365,12 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->newalias(
+    my $result = $fs->newalias
+      (
        # Required arguments
-       alias => $alias,
-       name  => $name,
-    );
+       alias			=> $alias,
+       name			=> $name,
+      );
 
 =head2 newcell
 
@@ -1550,31 +1378,18 @@ The fs help string is:
 
     fs newcell: configure new cell
     Usage: fs newcell -name <cell name> -servers <primary servers>+
-                      [-linkedcell <linked cell name>]
+		      [-linkedcell <linked cell name>]
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->newcell(
+    my $result = $fs->newcell
+      (
        # Required arguments
-       name       => $name,
-       servers    => $server, # OR [ $server1, $server2, ... ]
+       name			=> $name,
+       servers			=> $server, # OR [ $server1, $server2, ... ]
        # Optional arguments
-       linkedcell => $linkedcell,
-    );
-
-=head2 nukenfscreds
-
-The fs help string is:
-
-    fs nukenfscreds: nuke credentials for NFS client 
-    Usage: fs nukenfscreds -addr <host name or address>
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->nukenfscreds(
-       # Required arguments
-       addr => $addr,
-    );
+       linkedcell		=> $linkedcell,
+      );
 
 =head2 rmmount
 
@@ -1585,10 +1400,11 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->rmmount(
+    my $result = $fs->rmmount
+      (
        # Required arguments
-       dir => $dir, # OR [ $dir1, $dir2, ... ]
-    );
+       dir			=> $dir, # OR [ $dir1, $dir2, ... ]
+      );
 
 =head2 rxstatpeer
 
@@ -1597,17 +1413,18 @@ The fs help string is:
     fs rxstatpeer: Manage per peer RX statistics
     Usage: fs rxstatpeer [-enable] [-disable] [-clear]
     Where: -enable   Enable RX stats
-           -disable  Disable RX stats
-           -clear    Clear RX stats
+	   -disable  Disable RX stats
+	   -clear    Clear RX stats
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->rxstatpeer(
+    my $result = $fs->rxstatpeer
+      (
        # Optional arguments
-       enable  => 1,
-       disable => 1,
-       clear   => 1,
-    );
+       enable			=> 1,
+       disable			=> 1,
+       clear			=> 1,
+      );
 
 =head2 rxstatproc
 
@@ -1616,17 +1433,18 @@ The fs help string is:
     fs rxstatproc: Manage per process RX statistics
     Usage: fs rxstatproc [-enable] [-disable] [-clear]
     Where: -enable   Enable RX stats
-           -disable  Disable RX stats
-           -clear    Clear RX stats
+	   -disable  Disable RX stats
+	   -clear    Clear RX stats
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->rxstatproc(
+    my $result = $fs->rxstatproc
+      (
        # Optional arguments
-       enable  => 1,
-       disable => 1,
-       clear   => 1,
-    );
+       enable			=> 1,
+       disable			=> 1,
+       clear			=> 1,
+      );
 
 =head2 setacl
 
@@ -1634,24 +1452,25 @@ The fs help string is:
 
     fs setacl: set access control list
     Usage: fs setacl -dir <directory>+ -acl <access list entries>+
-                     [-clear] [-negative] [-id] [-if]
+		     [-clear] [-negative] [-id] [-if]
     Where: -clear     clear access list
-           -negative  apply to negative rights
-           -id        initial directory acl (DFS only)
-           -if        initial file acl (DFS only)
+	   -negative  apply to negative rights
+	   -id        initial directory acl (DFS only)
+	   -if        initial file acl (DFS only)
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->setacl(
+    my $result = $fs->setacl
+      (
        # Required arguments
-       dir      => $dir, # OR [ $dir1, $dir2, ... ]
-       acl      => [ <<see below>> ],
+       dir			=> $dir, # OR [ $dir1, $dir2, ... ]
+       acl			=> [ <<see below>> ],
        # Optional arguments
-       clear    => 1,
-       negative => 1,
-       id       => 1,
-       if       => 1,
-    );
+       clear			=> 1,
+       negative			=> 1,
+       id			=> 1,
+       if			=> 1,
+      );
 
 NOTE: The values passed to the 'acl' argument has to be constructed
 with care.  Unlike many of the other arguments, this has to be a seen
@@ -1664,26 +1483,29 @@ so there will be no splitting of this string on whitespace before we
 construct the arguments to fs, so it will look like a single argument,
 not four distinct arguments.
 
-Therefore, there are two ways to construct an ACL to pass to setacl:
+Therefore, there are two ways to construct an ACL to pass to setacl():
 
     my @acl = ( $user, 'read', $group, 'write' );
-    my $result = $fs->setacl(
-       dir => $dir,
-       acl => \@acl,
-    );
+    my $result = $fs->setacl
+      (
+       dir			=> $dir,
+       acl			=> \@acl,
+      );
 
-    my %acl = (
-       $user  => 'read',
-       $group => 'write',
-    );
-    my $result = $fs->setacl(
-       dir => $dir,
-       acl => \%acl,
-    );
+    my %acl =
+      (
+       $user			=> 'read',
+       $group			=> 'write',
+      );
+    my $result = $fs->setacl
+      (
+       dir			=> $dir,
+       acl			=> \%acl,
+      );
 
 In a future release of the API, maybe even 1.1, it will be possible to
-pass AFS::Object::ACL objects as arguments to these API calls, but not
-yet...
+pass AFS::Object::ACL objects as arguments to these API
+calls, but not yet...
 
 =head2 setcachesize
 
@@ -1695,25 +1517,12 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->setcachesize(
+    my $result = $fs->setcachesize
+      (
        # Optional arguments
-       blocks => $blocks,
-       reset  => 1,
-    );
-
-=head2 setcbaddr
-
-The fs help string is:
-
-    fs setcbaddr: configure callback connection address 
-    Usage: fs setcbaddr [-addr <host name or address>]
-
-The corresponding method invocation looks like:
-
-    my $result = $fs->setcbaddr(
-       # Optional arguments
-       addr => $addr,
-    );
+       blocks			=> $blocks,
+       reset			=> 1,
+      );
 
 =head2 setcell
 
@@ -1722,17 +1531,18 @@ The fs help string is:
     fs setcell: set cell status
     Usage: fs setcell -cell <cell name>+ [-suid] [-nosuid]
     Where: -suid    allow setuid programs
-           -nosuid  disallow setuid programs
+	   -nosuid  disallow setuid programs
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->setcell(
+    my $result = $fs->setcell
+      (
        # Required arguments
-       cell   => $cell, # OR [ $cell1, $cell2, ... ]
+       cell			=> $cell, # OR [ $cell1, $cell2, ... ]
        # Optional arguments
-       suid   => 1,
-       nosuid => 1,
-    );
+       suid			=> 1,
+       nosuid			=> 1,
+      );
 
 =head2 setclientaddrs
 
@@ -1743,10 +1553,11 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->setclientaddrs(
+    my $result = $fs->setclientaddrs
+      (
        # Required arguments
-       address => $address, # OR [ $address1, $address2, ... ]
-    );
+       address			=> $address, # OR [ $address1, $address2, ... ]
+      );
 
 =head2 setcrypt
 
@@ -1757,10 +1568,11 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->setcrypt(
+    my $result = $fs->setcrypt
+      (
        # Required arguments
-       crypt => 1,
-    );
+       crypt			=> 1,
+      );
 
 =head2 setquota
 
@@ -1771,12 +1583,13 @@ The fs help string is:
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->setquota(
+    my $result = $fs->setquota
+      (
        # Required arguments
-       max  => $max,
+       max			=> $max,
        # Optional arguments
-       path => $path, # OR [ $path1, $path2, ... ]
-    );
+       path			=> $path, # OR [ $path1, $path2, ... ]
+      );
 
 =head2 setserverprefs
 
@@ -1784,19 +1597,20 @@ The fs help string is:
 
     fs setserverprefs: set server ranks
     Usage: fs setserverprefs [-servers <fileserver names and ranks>+]
-                             [-vlservers <VL server names and ranks>+]
-                             [-file <input from named file>] [-stdin]
+			     [-vlservers <VL server names and ranks>+]
+			     [-file <input from named file>] [-stdin]
     Where: -stdin  input from stdin
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->setserverprefs(
+    my $result = $fs->setserverprefs
+      (
        # Optional arguments
-       servers   => $server, # OR [ $server1, $server2, ... ]
-       vlservers => $vlserver, # OR [ $vlserver1, $vlserver2, ... ]
-       file      => $file,
-       stdin     => 1,
-    );
+       servers			=> $server, # OR [ $server1, $server2, ... ]
+       vlservers		=> $vlserver, # OR [ $vlserver1, $vlserver2, ... ]
+       file			=> $file,
+       stdin			=> 1,
+      );
 
 =head2 setvol
 
@@ -1804,16 +1618,17 @@ The fs help string is:
 
     fs setvol: set volume status
     Usage: fs setvol [-path <dir/file path>+] [-max <disk space quota in 1K units>]
-                     [-offlinemsg <offline message>]
+		     [-offlinemsg <offline message>]
 
 The corresponding method invocation looks like:
 
-    my $result = $fs->setvol(
+    my $result = $fs->setvol
+      (
        # Optional arguments
-       path       => $path, # OR [ $path1, $path2, ... ]
-       max        => $max,
-       offlinemsg => $offlinemsg,
-    );
+       path			=> $path, # OR [ $path1, $path2, ... ]
+       max			=> $max,
+       offlinemsg   		=> $offlinemsg,
+      );
 
 =head1 SEE ALSO
 

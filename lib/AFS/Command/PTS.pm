@@ -1,90 +1,52 @@
+
 package AFS::Command::PTS;
 
-use Moose;
-use MooseX::Singleton;
+require 5.6.0;
+
+use strict;
 use English;
-use Carp;
 
-use feature q{switch};
-
-extends qw(AFS::Command::Base);
-
+use AFS::Command::Base;
 use AFS::Object;
 use AFS::Object::PTServer;
 use AFS::Object::Principal;
 use AFS::Object::Group;
 use AFS::Object::User;
 
-sub interactive { return shift->_unsupported( q{interactive} ); }
-sub sleep       { return shift->_unsupported( q{sleep}       ); }
-sub quit        { return shift->_unsupported( q{quit}        ); }
-sub source      { return shift->_unsupported( q{source}      ); }
-
-sub _unsupported {
-    my $self = shift;
-    my $operation = shift;
-    croak qq{Unsupported interactive pts operation: $operation};
-}
-
-sub getEntry {
-
-    my $self = shift;
-    my %args = @_;
-
-    if ( ref $args{nameorid} ) {
-        croak qq{Invalid argument: nameorid is a reference\n};
-    }
-
-    my $result = $self->examine( %args );
-
-    my ($object) = ( $result->getGroups, $result->getUsers );
-
-    return $object;
-
-}
-
-sub getMembership {
-
-    my $self = shift;
-    my %args = @_;
-
-    if ( ref $args{nameorid} ) {
-        croak qq{Invalid argument: nameorid is a reference\n};
-    }
-
-    my $result = $self->membership( %args );
-
-    my ($object) = ( $result->getGroups, $result->getUsers );
-    
-    return if not $object;
-
-    return $object->getMembership;
-
-}
+our @ISA = qw(AFS::Command::Base);
+our $VERSION = '1.99';
 
 sub creategroup {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::PTServer->new;
+    my $result = AFS::Object::PTServer->new();
 
-    $self->operation( q{creategroup} );
+    $self->{operation} = "creategroup";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        if ( m{group (\S+) has id (-\d+)}ms ) {
-            my $group = AFS::Object::Group->new( name => $1, id => $2 );
-            $result->_addGroup($group);
-        }
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+	next unless /group (\S+) has id (-\d+)/;
+	my $group = AFS::Object::Group->new
+	  (
+	   name 		=> $1,
+	   id			=> $2,
+	  );
+	$result->_addGroup($group);
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -92,36 +54,34 @@ sub creategroup {
 sub createuser {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::PTServer->new;
+    my $result = AFS::Object::PTServer->new();
 
-    $self->operation( q{createuser} );
+    $self->{operation} = "createuser";
 
-    # Workaround for dangerous pts createuser bug
-    # See: http://rt.central.org/rt/index.html?q=128343
-    # This simulates the error similar to creategroup
-    if ( $args{id} and $args{id} <  0 ) {
-        croak(
-            qq{pts: argument illegal or out of range because },
-            qq{user id $args{id} was not positive\n},
-        );
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+	next unless /User (\S+) has id (\d+)/;
+	my $user = AFS::Object::User->new
+	  (
+	   name 		=> $1,
+	   id			=> $2,
+	  );
+	$result->_addUser($user);
     }
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        if ( m{User (\S+) has id (\d+)}ms ) {
-            my $user = AFS::Object::User->new( name => $1, id => $2 );
-            $result->_addUser($user);
-        }
-    }
-
-    $self->_restore_stderr;
-    $self->_reap_commands;
-
+    return if $errors;
     return $result;
 
 }
@@ -129,123 +89,120 @@ sub createuser {
 sub examine {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::PTServer->new;
+    my $result = AFS::Object::PTServer->new();
 
-    $self->operation( q{examine} );
+    $self->{operation} = "examine";
 
-    $self->_parse_arguments(%args);
-    $self->_exec_commands( stderr => q{stdout} );
+    return unless $self->_parse_arguments(%args);
 
-    my $missing = 0;
+    return unless $self->_save_stderr();
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    my $errors = 0;
 
-        chomp;
+    $errors++ unless $self->_exec_cmds();
 
-        while ( m{,\s*$}ms ) {
-            $_ .= $self->_handle->getline;
-            chomp;
-        }
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        next if m{^\s*$}ms;
+	chomp;
 
-        if ( m{User or group doesn.t exist}ms ) {
-            $missing++;
-        } elsif ( m{Name:}ms ) {
+	while ( /,\s*$/ ) {
+	    $_ .= $self->{handle}->getline();
+	    chomp;
+	}
 
-            my %data = ();
+	my %data = ();
 
-            foreach my $field ( split m{,\s*}ms ) {
-                my ($key,$value) = split( m{:\s+}ms, $field, 2 );
-                $key =~ tr{A-Z}{a-z};
-                $key =~ s{\s+}{}gms; # group quota -> groupquota
-                $value =~ s{\.$}{}ms;
-                $data{$key} = $value;
-            }
+	foreach my $field ( split(/,\s*/) ) {
 
-            if ( not $data{id} ) {
-                croak qq{pts examine: Unrecognized output: '$_'};
-            }
+	    my ($key,$value) = split(/:\s+/,$field,2);
 
-            if ( $data{id} > 0 ) {
-                $result->_addUser( AFS::Object::User->new(%data) );
-            } else {
-                $result->_addGroup( AFS::Object::Group->new(%data) );
-            }
+	    $key =~ tr/A-Z/a-z/;
+	    $key =~ s/\s+//g;	# group quota -> groupquota
+	    $value =~ s/\.$//;
 
-        } else {
-            $self->_errors( $self->_errors . $_ );
-        }
+	    $data{$key} = $value;
+
+	}
+
+	unless ( $data{id} ) {
+	    $self->_Carp("pts examine: Unrecognized output: '$_'");
+	    $errors++;
+	    next;
+	}
+
+	if ( $data{id} > 0 ) {
+	    $result->_addUser( AFS::Object::User->new(%data) );
+	} else {
+	    $result->_addGroup( AFS::Object::Group->new(%data) );
+	}
 
     }
 
-    if ( $self->_errors ) {
-        croak $self->_errors;
-    }
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
-    if ( $result->getUsers or $result->getGroups ) {
-        $self->_reap_commands;
-        return $result;
-    } elsif ( $missing ) {
-        $self->_reap_commands( allowstatus => 1 );
-        return;
-    } else {
-        $self->_reap_commands;
-        return $result;
-    }
+    return if $errors;
+    return $result;
 
 }
 
 sub listentries {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::PTServer->new;
+    my $result = AFS::Object::PTServer->new();
 
-    $self->operation( q{listentries} );
+    $self->{operation} = "listentries";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    return unless $self->_save_stderr();
 
-        next if m{^Name}ms;
+    my $errors = 0;
 
-        my ($name,$id,$owner,$creator) = split;
+    $errors++ unless $self->_exec_cmds();
 
-        #
-        # We seem to be getting this one bogus line of data, with no
-        # name, and 0's for the IDs.  Probably a bug in pts...
-        #
-        next if ( not $name and not $id and not $owner and not $creator );
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        if ( $id > 0 ) {
-            my $user = AFS::Object::User->new(
-                name    => $name,
-                id      => $id,
-                owner   => $owner,
-                creator => $creator,
-            );
-            $result->_addUser($user);
-        } else {
-            my $group = AFS::Object::Group->new(
-                name    => $name,
-                id      => $id,
-                owner   => $owner,
-                creator => $creator,
-            );
-            $result->_addGroup($group);
-        }
+	next if /^Name/;
+
+	my ($name,$id,$owner,$creator) = split;
+
+	#
+	# We seem to be getting this one bogus line of data, with no
+	# name, and 0's for the IDs.  Probably a bug in pts...
+	#
+	next if ( ! $name && ! $id && ! $owner && ! $creator );
+
+	if ( $id > 0 ) {
+	    my $user = AFS::Object::User->new
+	      (
+	       name 			=> $name,
+	       id			=> $id,
+	       owner			=> $owner,
+	       creator			=> $creator,
+	      );
+	    $result->_addUser($user);
+	} else {
+	    my $group = AFS::Object::Group->new
+	      (
+	       name 			=> $name,
+	       id			=> $id,
+	       owner			=> $owner,
+	       creator			=> $creator,
+	      );
+	    $result->_addGroup($group);
+	}
 
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -253,27 +210,33 @@ sub listentries {
 sub listmax {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::PTServer->new;
+    my $result = AFS::Object::PTServer->new();
 
-    $self->operation( q{listmax} );
+    $self->{operation} = "listmax";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        next if not m{Max user id is (\d+) and max group id is (-\d+)}ms;
-        $result->_setAttribute(
-            maxuserid  => $1,
-            maxgroupid => $2,
-        );
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+	next unless /Max user id is (\d+) and max group id is (-\d+)/;
+	$result->_setAttribute
+	  (
+	   maxuserid		=> $1,
+	   maxgroupid		=> $2,
+	  );
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -281,58 +244,74 @@ sub listmax {
 sub listowned {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::PTServer->new;
+    my $result = AFS::Object::PTServer->new();
 
-    $self->operation( q{listowned} );
+    $self->{operation} = "listowned";
 
-    $self->_parse_arguments(%args);
-    $self->_exec_commands( stderr => q{stdout} );
+    return unless $self->_parse_arguments(%args);
 
-    my $user  = undef;
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds( stderr => 'stdout' );
+
+    my $user = undef;
     my $group = undef;
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        if ( m{Groups owned by (\S+) \(id: (-?\d+)\)}ms ) {
+	if ( /unable to get owner list|User or group doesn.t exist|No successful lookups for list/ ) {
 
-            my ($name,$id) = ($1,$2);
+	    #
+	    # pts still (as of OpenAFS 1.2.8) doesn't have proper exit codes.
+	    # If we see this string, then let the command fail, even
+	    # though we might have partial data.
+	    #
+	    $self->{errors} .= $_;
+	    $errors++;
 
-            if ( $id > 0 ) {
-                $user = AFS::Object::User->new( name => $name, id => $id );
-            } else {
-                $group = AFS::Object::Group->new( name => $name, id => $id );
-            }
+	} elsif ( /Groups owned by (\S+) \(id: (-?\d+)\)/ ) {
 
-            while ( defined($_ = $self->_handle->getline) ) {
-                chomp;
-                s{^\s+}{}gms;
-                s{\s+$}{}gms;
-                if ( $user ) {
-                    $user->_addOwned($_);
-                } else {
-                    $group->_addOwned($_);
-                }
-            }
+	    $result->_addUser($user) if $user;
+	    $result->_addGroup($group) if $group;
 
-            $result->_addUser($user)   if $user;
-            $result->_addGroup($group) if $group;
+	    my ($name,$id) = ($1,$2);
 
-        } else {
-            # pts listowned still (as of OpenAFS 1.5.77) doesn't
-            # have proper exit codes.  
-            $self->_errors( $self->_errors . $_ );
-        }
+	    if ( $id > 0 ) {
+		$user = AFS::Object::User->new
+		  (
+		   name 		=> $name,
+		   id			=> $id,
+		  );
+		$group = undef;
+	    } else {
+		$group = AFS::Object::Group->new
+		  (
+		   name 		=> $name,
+		   id			=> $id,
+		  );
+		$user = undef;
+	    }
+
+	} elsif ( /^\s+(\S+)\s*/ ) {
+
+	    if ( $user ) {
+		$user->_addOwned($1);
+	    } else {
+		$group->_addOwned($2);
+	    }
 
     }
 
-    $self->_reap_commands;
-
-    if ( $self->_errors ) {
-        croak $self->_errors;
     }
 
+    $result->_addUser($user) if $user;
+    $result->_addGroup($group) if $group;
+
+    $errors++ unless $self->_reap_cmds();
+
+    return if $errors;
     return $result;
 
 }
@@ -340,75 +319,77 @@ sub listowned {
 sub membership {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::PTServer->new;
+    my $result = AFS::Object::PTServer->new();
 
-    $self->operation( q{membership} );
+    $self->{operation} = "membership";
 
-    $self->_parse_arguments(%args);
-    $self->_exec_commands( stderr => q{stdout} );
+    return unless $self->_parse_arguments(%args);
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds( stderr => 'stdout' );
 
     my $user = undef;
     my $group = undef;
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        given ( $_ ) {
+	if ( /unable to get membership/ ||
+		  /User or group doesn.t exist/ ||
+		  /membership list for id \d+ exceeds display limit/ ||
+          /No successful lookups for list/ ) {
 
-            when ( m{(\S+) \(id: (-?\d+)\)}ms ) {
+	    #
+	    # pts still (as of OpenAFS 1.2.8) doesn't have proper exit codes.
+	    # If we see this string, then let the command fail, even
+	    # though we might have partial data.
+	    #
+	    $self->{errors} .= $_;
+	    $errors++;
 
-                $result->_addUser($user)   if $user;
-                $result->_addGroup($group) if $group;
+	} elsif ( /(\S+) \(id: (-?\d+)\)/ ) {
 
-                my ($name,$id) = ($1,$2);
+	    $result->_addUser($user) if $user;
+	    $result->_addGroup($group) if $group;
 
-                if ( $id > 0 ) {
-                    $user  = AFS::Object::User->new( name => $name, id => $id );
-                    $group = undef;
-                } else {
-                    $user  = undef;
-                    $group = AFS::Object::Group->new( name => $name, id => $id );
-                }
+	    my ($name,$id) = ($1,$2);
 
-            }
+	    if ( $id > 0 ) {
+		$user = AFS::Object::User->new
+		  (
+		   name 		=> $name,
+		   id			=> $id,
+		  );
+		$group = undef;
+	    } else {
+		$group = AFS::Object::Group->new
+		  (
+		   name 		=> $name,
+		   id			=> $id,
+		  );
+		$user = undef;
+	    }
 
-            when ( m{^\s+(\S+)\s*}ms ) {
+	} elsif ( /^\s+(\S+)\s*/ ) {
 
-                if ( $user ) {
-                    $user->_addMembership($1);
-                } else {
-                    $group->_addMembership($1);
-                }
+	    if ( $user ) {
+		$user->_addMembership($1);
+	    } else {
+		$group->_addMembership($1);
+	    }
 
-            }
-
-            when ( m{unable to get membership}ms ||
-                   m{User or group doesn't exist}ms ||
-                   m{membership list for id \d+ exceeds display limit}ms ) {
-
-                #
-                # pts still (as of OpenAFS 1.2.8) doesn't have proper exit codes.
-                # If we see this string, then let the command fail, even
-                # though we might have partial data.
-                #
-                $self->_errors( $self->_errors . $_ );
-
-            }
-
-        }
+	}
 
     }
 
     $result->_addUser($user) if $user;
     $result->_addGroup($group) if $group;
 
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
 
-    if ( $self->_errors ) {
-        croak $self->_errors;
-    }
-
+    return if $errors;
     return $result;
 
 }

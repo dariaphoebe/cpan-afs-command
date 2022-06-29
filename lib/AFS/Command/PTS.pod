@@ -7,37 +7,24 @@ AFS::Command::PTS - OO API to the AFS pts command
 
     use AFS::Command::PTS;
 
-    my $pts = AFS::Command::PTS->new;
+    my $pts = AFS::Command::PTS->new();
 
-    my $pts = AFS::Command::PTS->new( command => $path_to_your_pts_binary );
+    my $pts = AFS::Command::PTS->new
+      (
+       command			=> $path_to_your_pts_binary,
+      );
 
-    my $pts = AFS::Command::PTS->new(
-       noauth => 1,
-       force  => 1,
-    );
+    my $pts = AFS::Command::PTS->new
+      (
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =head1 DESCRIPTION
 
 This module implements an OO API wrapper around the AFS 'pts' command.
 The supported methods depend on the version of the pts binary used,
 and are determined automagically.
-
-=head1 METHODS -- Unsupported
-
-All of the following commands are unsupported, since they are only
-necessary when using pts interactively:
-
-=over
-
-=item interactive
-
-=item quit
-
-=item sleep
-
-=item source
-
-=back
 
 =head1 METHODS -- Inherited
 
@@ -48,48 +35,13 @@ class.  See that documentation for details.
 
 =item new
 
+=item errors
+
 =item supportsOperation
 
 =item supportsArgument
 
-=item supportsArgumentRequired
-
-=item supportsArgumentOptional
-
 =back
-
-=head1 METHODS (wrapper methods)
-
-=head2 getEntry
-
-This methid is a simple shorthand for querying a single PTS entry,
-which otherwise is done this way:
-
-    my $result = $pts->examine( nameorid => $name, cell => $cell );
-    my $nameobj = $result->getUserByName( $name ); # OR...
-    my $nameobj = $result->getGroupByName( $name ); # OR...
-
-This can be done with a single method call as follows:
-
-    my $nameobj = $pts->getEntry( nameorid => $name, cell => $cell );
-
-If the value of nameorid is a reference, then an exception is raised.
-
-=head2 getMembership
-
-This method is a simple shorthand for querying the membership of a
-single user or group, which otherwise has to be done this way:
-
-    my $result = $pts->membership( nameorid => $name, cell => $cell );
-    my $nameobj = $result->getUserByName( $name ); # OR...
-    my $nameobj = $result->getGroupByName( $name ); # OR...
-    my @members = $nameobj->getMembership;
-
-This can be done with a single method call as follows:
-
-    my @members = $pts->getMembership( nameorid => $name, cell => $cell );
-
-If the value of nameorid is a reference, then an exception is raised.
 
 =head1 METHODS (with complex return values)
 
@@ -103,64 +55,58 @@ The pts help string is:
 
     pts creategroup: create a new group
     Usage: pts creategroup -name <group name>+ [-owner <owner of the group>]
-                           [-id <id (negated) for the group>+]
-                           [-cell <cell name>] [-noauth] [-force]
-                           [-localauth] [-auth] [-encrypt]
+			   [-id <id (negated) for the group>+]
+			   [-cell <cell name>] [-noauth] [-force]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->creategroup(
+    my $result = $pts->creategroup
+      (
        # Required arguments
-       name      => $name,
+       name			=> $name, # OR [ $name1, $name2, ... ]
        # Optional arguments
-       owner     => $owner,
-       id        => $id,
-       cell      => $cell,
-       noauth    => 1,
-       force     => 1,
-       localauth => 1,
-       auth      => 1,
-       encrypt   => 1,
-    );
-
-NOTE: For more robust exception handling of individual group creation,
-this method does NOT support a list of names or ids.
+       owner			=> $owner,
+       id			=> $id, # OR [ $id1, $id2, ... ]
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =item Return Values
 
 This method returns an AFS::Object::PTServer object, which
 contains one AFS::Object::Group for each group created.
 
-    my $result = $pts->creategroup(
-       name  => $name,
-       owner => $owner,
-    );
-
-    foreach my $group ( $result->getGroups ) {
-        my ($grname,$grid) = ($group->name,$group->id);
-        print qq{New group $grname has id $grid\n};
+    my $result = $pts->creategroup
+      (
+       name			=> $name,
+       owner		=> $owner,
+      ) || die $pts->errors();
+    foreach my $group ( $result->getGroups() ) {
+	my ($grname,$grid) = ($group->name(),$group->id());
+	print "New group $grname has id $grid\n";
     }
 
 Each of these objects has the following attributes and methods:
 
 B<AFS::Object::PTServer>
 
-    Methods                     Returns
-    -------                     -------
-    getGroupNames               list of group names
-    getGroupIds                 list of group ids
-    getGroups                   list of AFS::Object::Group objects
-    getGroupByName($name)       the AFS::Object::Group object for group $name
-    getGroupById($id)           the AFS::Object::Group object for id $id
-    getGroup( name => $name )   the AFS::Object::Group object for group $name
-    getGroup( id => $id )       the AFS::Object::Group object for id $id
+    Methods			Returns
+    -------			-------
+    getGroupNames()		list of group names
+    getGroupIds()		list of group ids
+    getGroups()			list of AFS::Object::Group objects
+    getGroupByName($name)	the AFS::Object::Group object for group $name
+    getGroupById($id)		the AFS::Object::Group object for id $id
+    getGroup( name => $name )	the AFS::Object::Group object for group $name
+    getGroup( id => $id )	the AFS::Object::Group object for id $id
 
 B<AFS::Object::Group>
 
-    Attributes                  Values
-    ----------                  ------
-    name                        Group name
-    id                          Group id
+    Attributes			Values
+    ----------			------
+    name			Group name
+    id				Group id
 
 =back
 
@@ -174,63 +120,57 @@ The pts help string is:
 
     pts createuser: create a new user
     Usage: pts createuser -name <user name>+ [-id <user id>+]
-                          [-cell <cell name>] [-noauth] [-force]
-                          [-localauth] [-auth] [-encrypt]
+			  [-cell <cell name>] [-noauth] [-force]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->createuser(
+    my $result = $pts->createuser
+      (
        # Required arguments
-       name      => $name,
+       name			=> $name, # OR [ $name1, $name2, ... ]
        # Optional arguments
-       owner     => $owner,
-       id        => $id,
-       cell      => $cell,
-       noauth    => 1,
-       force     => 1,
-       localauth => 1,
-       auth      => 1,
-       encrypt   => 1,
-    );
-
-NOTE: For more robust exception handling of individual user creation,
-this method does NOT support a list of names or ids.
+       owner			=> $owner,
+       id			=> $id, # OR [ $id1, $id2, ... ]
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =item Return Values
 
 This method returns an AFS::Object::PTServer object, which
 contains one AFS::Object::User for each user created.
 
-    my $result = $pts->createuser(
-       name  => $name,
-       owner => $owner,
-    );
-
-    foreach my $user ( $result->getUsers ) {
-        my ($username,$userid) = ($user->name,$user->id);
-        print qq{New user $username has id $userid\n};
+    my $result = $pts->createuser
+      (
+       name			=> $name,
+       owner		=> $owner,
+      ) || die $pts->errors();
+    foreach my $user ( $result->getUsers() ) {
+	my ($username,$userid) = ($user->name(),$user->id());
+	print "New user $username has id $userid\n";
     }
 
 Each of these objects has the following attributes and methods:
 
 B<AFS::Object::PTServer>
 
-    Methods                     Returns
-    -------                     -------
-    getUserNames                list of user names
-    getUserIds                  list of user ids
-    getUsers                    list of AFS::Object::User objects
-    getUserByName($name)        the AFS::Object::User object for user $name
-    getUserById($id)            the AFS::Object::User object for id $id
-    getUser( name => $name )    the AFS::Object::User object for user $name
-    getUser( id => $id )        the AFS::Object::User object for id $id
+    Methods			Returns
+    -------			-------
+    getUserNames()		list of user names
+    getUserIds()		list of user ids
+    getUsers()			list of AFS::Object::User objects
+    getUserByName($name)	the AFS::Object::User object for user $name
+    getUserById($id)		the AFS::Object::User object for id $id
+    getUser( name => $name )	the AFS::Object::User object for user $name
+    getUser( id => $id )	the AFS::Object::User object for id $id
 
 B<AFS::Object::User>
 
-    Attributes                  Values
-    ----------                  ------
-    name                        User name
-    id                          User id
+    Attributes			Values
+    ----------			------
+    name			User name
+    id				User id
 
 =back
 
@@ -244,78 +184,72 @@ The pts help string is:
 
     pts examine: examine an entry
     Usage: pts examine -nameorid <user or group name or id>+
-                       [-cell <cell name>] [-noauth] [-force]
-                       [-localauth] [-auth] [-encrypt]
+		       [-cell <cell name>] [-noauth] [-force]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->examine(
+    my $result = $pts->examine
+      (
        # Required arguments
-       nameorid  => $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
+       nameorid			=> $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
        # Optional arguments
-       cell      => $cell,
-       noauth    => 1,
-       force     => 1,
-       localauth => 1,
-       auth      => 1,
-       encrypt   => 1,
-    );
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =item Return Values
 
-This method returns an AFS::Object::PTServer object, which contains
-one AFS::Object::User or AFS::Object::Group object for each user/group
-examined.
+This method returns an AFS::Object::PTServer object, which
+contains one AFS::Object::User or AFS::Object::Group
+object for each user/group examined.
 
-    my $result = $pts->examine(
-       nameorid => [ $name1, $name2 ],
-    );
-
-    foreach my $userobj ( $result->getUser ) {
-        my ($name,$id) = ($userobj->name,$userobj->id);
-        print qq{User $name has id $id\n};
+    my $result = $pts->examine
+      (
+       nameorid			=> [ $name1, $name2 ],
+       cell				=> 1,
+      ) || die $pts->errors();
+    foreach my $userobj ( $result->getUser() ) {
+	my ($name,$id) = ($userobj->name(),$userobj->id());
+	print "User $name has id $id\n";
     }
-    foreach my $groupobj ( $result->getGroups ) {
-        my ($name,$id) = ($groupobj->name,$groupobj->id);
-        print qq{Group $name has id $id\n};
+    foreach my $groupobj ( $result->getGroups() ) {
+	my ($name,$id) = ($groupobj->name(),$groupobj->id());
+	print "Group $name has id $id\n";
     }
-
-If none of the users or groups were found at all, then this method
-returns nothing at all.  The object is only returned if at least one
-of the users or groups was valid.
 
 Each of these objects has the following attributes and methods:
 
 B<AFS::Object::PTServer>
 
-    Methods                     Returns
-    -------                     -------
-    getGroupNames               list of group names
-    getGroupIds                 list of group ids
-    getGroups                   list of AFS::Object::Group objects
-    getGroupByName($name)       the AFS::Object::Group object for group $name
-    getGroupById($id)           the AFS::Object::Group object for id $id
-    getGroup( name => $name )   the AFS::Object::Group object for group $name
-    getGroup( id => $id )       the AFS::Object::Group object for id $id
-    getUserNames                list of user names
-    getUserIds                  list of user ids
-    getUsers                    list of AFS::Object::User objects
-    getUserByName($name)        the AFS::Object::User object for user $name
-    getUserById($id)            the AFS::Object::User object for id $id
-    getUser( name => $name )    the AFS::Object::User object for user $name
-    getUser( id => $id )        the AFS::Object::User object for id $id
+    Methods			Returns
+    -------			-------
+    getGroupNames()		list of group names
+    getGroupIds()		list of group ids
+    getGroups()			list of AFS::Object::Group objects
+    getGroupByName($name)	the AFS::Object::Group object for group $name
+    getGroupById($id)		the AFS::Object::Group object for id $id
+    getGroup( name => $name )	the AFS::Object::Group object for group $name
+    getGroup( id => $id )	the AFS::Object::Group object for id $id
+    getUserNames()		list of user names
+    getUserIds()		list of user ids
+    getUsers()			list of AFS::Object::User objects
+    getUserByName($name)	the AFS::Object::User object for user $name
+    getUserById($id)		the AFS::Object::User object for id $id
+    getUser( name => $name )	the AFS::Object::User object for user $name
+    getUser( id => $id )	the AFS::Object::User object for id $id
 
 B<AFS::Object::User>, B<AFS::Object::Group>
 
-    Attributes                  Values
-    ----------                  ------
-    name                        User or group name
-    id                          User or group id
-    owner                       Owner of the entry
-    creator                     Creator of the entry
-    membership                  Number of groups the user is a member of, or..
-                                Number of members of the group
-    groupquota                  Group creation quota
+    Attributes			Values
+    ----------			------
+    name			User or group name
+    id				User or group id
+    owner			Owner of the entry
+    creator			Creator of the entry
+    membership			Number of groups the user is a member of, or..
+				Number of members of the group
+    groupquota			Group creation quota
 
 =back
 
@@ -329,34 +263,34 @@ The pts help string is:
 
     pts listentries: list users/groups in the protection database
     Usage: pts listentries [-users] [-groups] [-cell <cell name>]
-                           [-noauth] [-force] [-localauth] [-auth] [-encrypt]
+			   [-noauth] [-force]
+    Where: -users   list user entries
+	   -groups  list group entries
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->listentries(
+    my $result = $pts->listentries
+      (
        # Optional arguments
-       users     => 1,
-       groups    => 1,
-       cell      => $cell,
-       noauth    => 1,
-       force     => 1,
-       localauth => 1,
-       auth      => 1,
-       encrypt   => 1,
-    );
+       users			=> 1,
+       groups			=> 1,
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =item Return Values
 
-This method returns an AFS::Object::PTServer object, which contains
-one AFS::Object::User or AFS::Object::Group object for each user/group
-listed.
+This method returns an AFS::Object::PTServer object, which
+contains one AFS::Object::User or AFS::Object::Group
+object for each user/group listed.
 
-    my $result = $pts->listentries(
-       users  => 1,
-       groups => 1,
-       cell   => $cell,
-    );
-
+    my $result = $pts->listentries
+      (
+       users			=> 1,
+       groups			=> 1,
+       cell				=> $cell,
+      ) || die $pts->errors();
     # Starting to see a pattern?  The result is parsed in almost the
     # same way as shown for examine
 
@@ -364,31 +298,31 @@ Each of these objects has the following attributes and methods:
 
 B<AFS::Object::PTServer>
 
-    Methods                     Returns
-    -------                     -------
-    getGroupNames               list of group names
-    getGroupIds                 list of group ids
-    getGroups                   list of AFS::Object::Group objects
-    getGroupByName($name)       the AFS::Object::Group object for group $name
-    getGroupById($id)           the AFS::Object::Group object for id $id
-    getGroup( name => $name )   the AFS::Object::Group object for group $name
-    getGroup( id => $id )       the AFS::Object::Group object for id $id
-    getUserNames                list of user names
-    getUserIds                  list of user ids
-    getUsers                    list of AFS::Object::User objects
-    getUserByName($name)        the AFS::Object::User object for user $name
-    getUserById($id)            the AFS::Object::User object for id $id
-    getUser( name => $name )    the AFS::Object::User object for user $name
-    getUser( id => $id )        the AFS::Object::User object for id $id
+    Methods			Returns
+    -------			-------
+    getGroupNames()		list of group names
+    getGroupIds()		list of group ids
+    getGroups()			list of AFS::Object::Group objects
+    getGroupByName($name)	the AFS::Object::Group object for group $name
+    getGroupById($id)		the AFS::Object::Group object for id $id
+    getGroup( name => $name )	the AFS::Object::Group object for group $name
+    getGroup( id => $id )	the AFS::Object::Group object for id $id
+    getUserNames()		list of user names
+    getUserIds()		list of user ids
+    getUsers()			list of AFS::Object::User objects
+    getUserByName($name)	the AFS::Object::User object for user $name
+    getUserById($id)		the AFS::Object::User object for id $id
+    getUser( name => $name )	the AFS::Object::User object for user $name
+    getUser( id => $id )	the AFS::Object::User object for id $id
 
 B<AFS::Object::User>, B<AFS::Object::Group>
 
-    Attributes                  Values
-    ----------                  ------
-    name                        User or group name
-    id                          User or group id
-    owner                       Numeric id of the owner of the entry
-    creator                     Numeric id of the creator of the entry
+    Attributes			Values
+    ----------			------
+    name			User or group name
+    id				User or group id
+    owner			Numeric id of the owner of the entry
+    creator			Numeric id of the creator of the entry
 
 =back
 
@@ -402,38 +336,35 @@ The pts help string is:
 
     pts listmax: list max id
     Usage: pts listmax [-cell <cell name>] [-noauth] [-force]
-                       [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->listmax(
+    my $result = $pts->listmax
+      (
        # Optional arguments
-       cell      => $cell,
-       noauth    => 1,
-       force     => 1,
-       localauth => 1,
-       auth      => 1,
-       encrypt   => 1,
-    );
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =item Return Values
 
 This method returns an AFS::Object::PTServer object, which
 contains two attributes:
 
-    my $result = $pts->listmax(
-       cell => $cell,
-    );
-
-    print qq{Maximum group ID is } . $result->maxgroupid . qq{\n};
-    print qq{Maximum user ID is } . $result->maxuserid . qq{\n};
+    my $result = $pts->listmax
+      (
+       cell				=> $cell,
+      ) || die $pts->errors();
+    print "Maximum group ID is " . $result->maxgroupid() . "\n";
+    print "Maximum user ID is " . $result->maxuserid() . "\n";
 
 This object has the following attributes, which are always present:
 
-    Attributes                  Values
-    ----------                  ------
-    maxgroupid                  Numeric value of the highest group ID
-    maxuserid                   Numeric value of the highest user ID
+    Attributes			Values
+    ----------			------
+    maxgroupid			Numeric value of the highest group ID
+    maxuserid			Numeric value of the highest user ID
 
 =back
 
@@ -447,26 +378,19 @@ The pts help string is:
 
     pts listowned: list groups owned by an entry or zero id gets orphaned groups
     Usage: pts listowned -nameorid <user or group name or id>+
-                         [-cell <cell name>] [-noauth] [-force]
-                         [-localauth] [-auth] [-encrypt]
+			 [-cell <cell name>] [-noauth] [-force]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->listowned(
+    my $result = $pts->listowned
+      (
        # Required arguments
-       nameorid  => $nameorid,
+       nameorid			=> $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
        # Optional arguments
-       cell      => $cell,
-       noauth    => 1,
-       force     => 1,
-       localauth => 1,
-       auth      => 1,
-       encrypt   => 1,
-    );
-
-NOTE: In order to parse the output of this command deterministically,
-and provide proper error checking, listowned does NOT accept an ARRAY
-ref for the nameorid argument.
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =item Return Values
 
@@ -474,48 +398,48 @@ This method returns an AFS::Object::PTServer object, which
 contains one AFS::Object::User or AFS::Object::Group
 object for each user/group specified.
 
-    my $result = $pts->listowned(
-       nameorid => $user,
-       cell     => $cell,
-    );
-
+    my $result = $pts->listowned
+      (
+       nameorid			=> $user,
+       cell				=> $cell,
+      ) || die $pts->errors();
     my $userobj = $result->getUserbyName($user);
-    print qq{User $user owns the following groups:\n};
-    foreach my $owned ( $userobj->getOwned ) {
-        print qq{\t$owned\n};
+    print "User $user owns the following groups:\n";
+    foreach my $owned ( $userobj->getOwned() ) {
+	print "\t$owned\n";
     }
 
 Each of these objects has the following attributes and methods:
 
 B<AFS::Object::PTServer>
 
-    Methods                     Returns
-    -------                     -------
-    getGroupNames               list of group names
-    getGroupIds                 list of group ids
-    getGroups                   list of AFS::Object::Group objects
-    getGroupByName($name)       the AFS::Object::Group object for group $name
-    getGroupById($id)           the AFS::Object::Group object for id $id
-    getGroup( name => $name )   the AFS::Object::Group object for group $name
-    getGroup( id => $id )       the AFS::Object::Group object for id $id
-    getUserNames                list of user names
-    getUserIds                  list of user ids
-    getUsers                    list of AFS::Object::User objects
-    getUserByName($name)        the AFS::Object::User object for user $name
-    getUserById($id)            the AFS::Object::User object for id $id
-    getUser( name => $name )    the AFS::Object::User object for user $name
-    getUser( id => $id )        the AFS::Object::User object for id $id
+    Methods			Returns
+    -------			-------
+    getGroupNames()		list of group names
+    getGroupIds()		list of group ids
+    getGroups()			list of AFS::Object::Group objects
+    getGroupByName($name)	the AFS::Object::Group object for group $name
+    getGroupById($id)		the AFS::Object::Group object for id $id
+    getGroup( name => $name )	the AFS::Object::Group object for group $name
+    getGroup( id => $id )	the AFS::Object::Group object for id $id
+    getUserNames()		list of user names
+    getUserIds()		list of user ids
+    getUsers()			list of AFS::Object::User objects
+    getUserByName($name)	the AFS::Object::User object for user $name
+    getUserById($id)		the AFS::Object::User object for id $id
+    getUser( name => $name )	the AFS::Object::User object for user $name
+    getUser( id => $id )	the AFS::Object::User object for id $id
 
 B<AFS::Object::User>, B<AFS::Object::Group>
 
-    Attributes                  Values
-    ----------                  ------
-    name                        User or group name
-    id                          User or group id
+    Attributes			Values
+    ----------			------
+    name			User or group name
+    id				User or group id
 
-    Methods                     Returns
-    -------                     -------
-    getOwned                    list of group names owned by the user or group
+    Methods			Returns
+    -------			-------
+    getOwned()			list of group names owned by the user or group
 
 =back
 
@@ -529,87 +453,69 @@ The pts help string is:
 
     pts membership: list membership of a user or group
     Usage: pts membership -nameorid <user or group name or id>+
-                          [-supergroups] [-expandgroups]
-                          [-cell <cell name>] [-noauth] [-force]
-                          [-localauth] [-auth] [-encrypt]
+			  [-cell <cell name>] [-noauth] [-force]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->membership(
+    my $result = $pts->membership
+      (
        # Required arguments
-       nameorid => $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
+       nameorid			=> $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
        # Optional arguments
-       supergroups  => 1, # See below
-       expandgroups => 1, # See below
-       cell         => $cell,
-       noauth       => 1,
-       force        => 1,
-       localauth    => 1,
-       auth         => 1,
-       encrypt      => 1,
-    );
-
-NOTE: This version of the API does not yet supported parsing the
-output of this command when either -supergroups or -expandgroups is
-specified.  Until this support is implemented, neither argument will
-be supported.  This means that:
-
-    $bos->supportsArgument( q{membership}, q{supergroups} )
-    $bos->supportsArgument( q{membership}, q{expandgroup} )
-
-will return false, even if your pts binary supports -supergroups
-and/or -expandgroups.  Support for both options should be available
-before AFS::Command is released as 2.X.
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =item Return Values
 
-This method returns an AFS::Object::PTServer object, which contains
-one AFS::Object::User or AFS::Object::Group object for each user/group
-specified.
+This method returns an AFS::Object::PTServer object, which
+contains one AFS::Object::User or AFS::Object::Group
+object for each user/group specified.
 
-    my $result = $pts->membership(
-       nameorid => $user,
-       cell     => $cell,
-    );
-
+    my $result = $pts->membership
+      (
+       nameorid			=> $user,
+       cell			=> $cell,
+      ) || die $pts->errors();
     my $userobj = $result->getUserbyName($user);
-    print qq{User $user is a member of these groups:\n};
-    foreach my $group ( $userobj->getMembership ) {
-        print qq{\t$group\n};
+    print "User $user is a member of these groups:\n";
+    foreach my $group ( $userobj->getMembership() ) {
+	print "\t$group\n";
     }
 
 Each of these objects has the following attributes and methods:
 
 B<AFS::Object::PTServer>
 
-    Methods                     Returns
-    -------                     -------
-    getGroupNames               list of group names
-    getGroupIds                 list of group ids
-    getGroups                   list of AFS::Object::Group objects
-    getGroupByName($name)       the AFS::Object::Group object for group $name
-    getGroupById($id)           the AFS::Object::Group object for id $id
-    getGroup( name => $name )   the AFS::Object::Group object for group $name
-    getGroup( id => $id )       the AFS::Object::Group object for id $id
-    getUserNames                list of user names
-    getUserIds                  list of user ids
-    getUsers                    list of AFS::Object::User objects
-    getUserByName($name)        the AFS::Object::User object for user $name
-    getUserById($id)            the AFS::Object::User object for id $id
-    getUser( name => $name )    the AFS::Object::User object for user $name
-    getUser( id => $id )        the AFS::Object::User object for id $id
+    Methods			Returns
+    -------			-------
+    getGroupNames()		list of group names
+    getGroupIds()		list of group ids
+    getGroups()			list of AFS::Object::Group objects
+    getGroupByName($name)	the AFS::Object::Group object for group $name
+    getGroupById($id)		the AFS::Object::Group object for id $id
+    getGroup( name => $name )	the AFS::Object::Group object for group $name
+    getGroup( id => $id )	the AFS::Object::Group object for id $id
+    getUserNames()		list of user names
+    getUserIds()		list of user ids
+    getUsers()			list of AFS::Object::User objects
+    getUserByName($name)	the AFS::Object::User object for user $name
+    getUserById($id)		the AFS::Object::User object for id $id
+    getUser( name => $name )	the AFS::Object::User object for user $name
+    getUser( id => $id )	the AFS::Object::User object for id $id
 
 B<AFS::Object::User>, B<AFS::Object::Group>
 
-    Attributes                  Values
-    ----------                  ------
-    name                        User or group name
-    id                          User or group id
+    Attributes			Values
+    ----------			------
+    name			User or group name
+    id				User or group id
 
-    Methods                     Returns
-    -------                     -------
-    getMembership               For a user, the list of group to which the user belongs,
-                                for a group, the members of the group
+    Methods			Returns
+    -------			-------
+    getMembership()		For a user, the list of group to which the user belongs,
+				for a group, the members of the group
 
 =back
 
@@ -624,23 +530,20 @@ The pts help string is:
 
     pts adduser: add a user to a group
     Usage: pts adduser -user <user name>+ -group <group name>+
-                       [-cell <cell name>] [-noauth] [-force]
-                       [-localauth] [-auth] [-encrypt]
+		       [-cell <cell name>] [-noauth] [-force]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->adduser(
+    my $result = $pts->adduser
+      (
        # Required arguments
-       user      => $user,  # OR [ $user1, $user2, ... ]
-       group     => $group, # OR [ $group1, $group2, ... ]
+       user			=> $user, # OR [ $user1, $user2, ... ]
+       group			=> $group, # OR [ $group1, $group2, ... ]
        # Optional arguments
-       cell      => $cell,
-       noauth    => 1,
-       force     => 1,
-       localauth => 1,
-       auth      => 1,
-       encrypt   => 1,
-    );
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =head2 chown
 
@@ -648,23 +551,20 @@ The pts help string is:
 
     pts chown: change ownership of a group
     Usage: pts chown -name <group name> -owner <new owner>
-                     [-cell <cell name>] [-noauth] [-force]
-                     [-localauth] [-auth] [-encrypt]
+		     [-cell <cell name>] [-noauth] [-force]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->chown(
+    my $result = $pts->chown
+      (
        # Required arguments
-       name      => $name,
-       owner     => $owner,
+       name			=> $name,
+       owner			=> $owner,
        # Optional arguments
-       cell      => $cell,
-       noauth    => 1,
-       force     => 1,
-       localauth => 1,
-       auth      => 1,
-       encrypt   => 1,
-    );
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =head2 delete
 
@@ -672,22 +572,19 @@ The pts help string is:
 
     pts delete: delete a user or group from database
     Usage: pts delete -nameorid <user or group name or id>+
-                      [-cell <cell name>] [-noauth] [-force]
-                      [-localauth] [-auth] [-encrypt]
+		      [-cell <cell name>] [-noauth] [-force]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->delete(
+    my $result = $pts->delete
+      (
        # Required arguments
-       nameorid  => $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
+       nameorid			=> $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
        # Optional arguments
-       cell      => $cell,
-       noauth    => 1,
-       force     => 1,
-       localauth => 1,
-       auth      => 1,
-       encrypt   => 1,
-    );
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =head2 removeuser
 
@@ -695,23 +592,20 @@ The pts help string is:
 
     pts removeuser: remove a user from a group
     Usage: pts removeuser -user <user name>+ -group <group name>+
-                          [-cell <cell name>] [-noauth] [-force]
-                          [-localauth] [-auth] [-encrypt]
+			  [-cell <cell name>] [-noauth] [-force]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->removeuser(
+    my $result = $pts->removeuser
+      (
        # Required arguments
-       user      => $user, # OR [ $user1, $user2, ... ]
-       group     => $group, # OR [ $group1, $group2, ... ]
+       user			=> $user, # OR [ $user1, $user2, ... ]
+       group			=> $group, # OR [ $group1, $group2, ... ]
        # Optional arguments
-       cell      => $cell,
-       noauth    => 1,
-       force     => 1,
-       localauth => 1,
-       auth      => 1,
-       encrypt   => 1,
-    );
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =head2 rename
 
@@ -719,23 +613,20 @@ The pts help string is:
 
     pts rename: rename user or group
     Usage: pts rename -oldname <old name> -newname <new name>
-                      [-cell <cell name>] [-noauth] [-force]
-                      [-localauth] [-auth] [-encrypt]
+		      [-cell <cell name>] [-noauth] [-force]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->rename(
+    my $result = $pts->rename
+      (
        # Required arguments
-       oldname   => $oldname,
-       newname   => $newname,
+       oldname			=> $oldname,
+       newname			=> $newname,
        # Optional arguments
-       cell      => $cell,
-       noauth    => 1,
-       force     => 1,
-       localauth => 1,
-       auth      => 1,
-       encrypt   => 1,
-    );
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =head2 setfields
 
@@ -745,23 +636,20 @@ pts setfields: set fields for an entry
 Usage: pts setfields -nameorid <user or group name or id>+ [-access <set privacy flags>]
                      [-groupquota <set limit on group creation>]
                      [-cell <cell name>] [-noauth] [-force]
-                     [-localauth] [-auth] [-encrypt]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->setfields(
+    my $result = $pts->setfields
+      (
        # Required arguments
-       nameorid   => $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
+       nameorid			=> $nameorid, # OR [ $nameorid1, $nameorid2, ... ]
        # Optional arguments
-       access     => $access,
-       groupquota => $groupquota,
-       cell       => $cell,
-       noauth     => 1,
-       force      => 1,
-       localauth  => 1,
-       auth       => 1,
-       encrypt    => 1,
-    );
+       access			=> $access,
+       groupquota		=> $groupquota,
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =head2 setmax
 
@@ -769,22 +657,19 @@ The pts help string is:
 
     pts setmax: set max id
     Usage: pts setmax [-group <group max>] [-user <user max>]
-                      [-cell <cell name>] [-noauth] [-force]
-                      [-localauth] [-auth] [-encrypt]
+		      [-cell <cell name>] [-noauth] [-force]
 
 The corresponding method invocation looks like:
 
-    my $result = $pts->setmax(
+    my $result = $pts->setmax
+      (
        # Optional arguments
-       user      => $user,
-       group     => $group,
-       cell      => $cell,
-       noauth    => 1,
-       force     => 1,
-       localauth => 1,
-       auth      => 1,
-       encrypt   => 1,
-    );
+       user			=> $user,
+       group			=> $group,
+       cell			=> $cell,
+       noauth			=> 1,
+       force			=> 1,
+      );
 
 =head1 SEE ALSO
 

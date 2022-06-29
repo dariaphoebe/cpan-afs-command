@@ -7,53 +7,63 @@ use MooseX::Singleton;
 use English;
 use Carp;
 
-extends qw(AFS::Command::Base);
-
+use AFS::Command::Base;
 use AFS::Object;
 use AFS::Object::BosServer;
 use AFS::Object::Instance;
+use AFS::Object::Principal;
+use AFS::Object::User;
+
+our @ISA = qw(AFS::Command::Base);
+our $VERSION = '1.99';
 
 sub getdate {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::BosServer->new;
+    my $result = AFS::Object::BosServer->new();
 
-    $self->operation( q{getdate} );
+    $self->{operation} = "getdate";
 
-    my $directory = $args{dir} || q{/usr/afs/bin};
+    my $directory = $args{dir} || '/usr/libexec/yfs';
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    return unless $self->_save_stderr();
 
-        chomp;
+    my $errors = 0;
 
-        next if not m{File \s+ $directory/(\S+) \s+ dated \s+ ([^,]+),}msx;
+    $errors++ unless $self->_exec_cmds();
 
-        my $file = AFS::Object->new(
-            file => $1,
-            date => $2,
-        );
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        if ( m{\.BAK dated ([^,]+),}ms ) {
-            $file->_setAttribute( bak => $1 );
-        }
+	chomp;
 
-        if ( m{\.OLD dated ([^,\.]+)}ms ) {
-            $file->_setAttribute( old => $1 );
-        }
+	next unless m:File $directory/(\S+) dated ([^,]+),:;
 
-        $result->_addFile($file);
+	my $file = AFS::Object->new
+	  (
+	   file			=> $1,
+	   date			=> $2,
+	  );
+
+	if ( /\.BAK dated ([^,]+),/ ) {
+	    $file->_setAttribute( bak => $1 );
+	}
+
+	if ( /\.OLD dated ([^,\.]+)/ ) {
+	    $file->_setAttribute( old => $1 );
+	}
+
+	$result->_addFile($file);
 
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -61,46 +71,56 @@ sub getdate {
 sub getlog {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::BosServer->new;
+    my $result = AFS::Object::BosServer->new();
 
-    $self->operation( q{getlog} );
+    $self->{operation} = "getlog";
 
     my $redirect = undef;
     my $redirectname = undef;
 
     if ( $args{redirect} ) {
-        $redirectname = delete $args{redirect};
-        $redirect = IO::File->new( qq{>$redirectname} ) || 
-            croak qq{Unable to write to $redirectname: $ERRNO};
+	$redirectname = delete $args{redirect};
+	$redirect = IO::File->new(">$redirectname") || do {
+	    $self->_Carp("Unable to write to $redirectname: $ERRNO");
+	    return;
+	};
     }
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    my $log = q{};
+    return unless $self->_save_stderr();
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        next if m{^Fetching log file}ms;
-        if ( $redirect ) {
-            $redirect->print($_);
-        } else {
-            $log .= $_;
-        }
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    my $log = "";
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+	next if /^Fetching log file/;
+	if ( $redirect ) {
+	    $redirect->print($_);
+	} else {
+	    $log .= $_;
+	}
     }
 
     if ( $redirect ) {
-        $redirect->close || croak qq{Unable to close $redirectname: $ERRNO};
-        $result->_setAttribute( log => $redirectname );
+	$redirect->close()|| do {
+	    $self->_Carp("Unable to close $redirectname: $ERRNO");
+	    $errors++
+	};
+	$result->_setAttribute( log => $redirectname );
     } else {
-        $result->_setAttribute( log => $log );
+	$result->_setAttribute( log => $log );
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -108,29 +128,34 @@ sub getlog {
 sub getrestart {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::BosServer->new;
+    my $result = AFS::Object::BosServer->new();
 
-    $self->operation( q{getrestart} );
+    $self->{operation} = "getrestart";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    return unless $self->_save_stderr();
 
-        if ( m{restarts at (.*)}ms || m{restarts (never)}ms ) {
-            $result->_setAttribute( restart => $1 );
-        } elsif ( m{binaries at (.*)}ms || m{binaries (never)}ms ) {
-            $result->_setAttribute( binaries => $1 );
-        }
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	if ( /restarts at (.*)/ || /restarts (never)/ ) {
+	    $result->_setAttribute( restart => $1 );
+	} elsif ( /binaries at (.*)/ || /binaries (never)/ ) {
+	    $result->_setAttribute( binaries => $1 );
+	}
 
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -138,25 +163,34 @@ sub getrestart {
 sub getrestricted {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::BosServer->new;
+    my $result = AFS::Object::BosServer->new();
 
-    $self->operation( q{getrestricted} );
+    $self->{operation} = "getrestricted";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        if ( m{Restricted mode is (\S+)}ms ) {
-            $result->_setAttribute( restricted => $1 );
-        }
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	chomp;
+
+	next unless m:Restricted mode is (\S+):;
+
+    $result->_setAttribute( restricted => $1 );
+
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -164,37 +198,42 @@ sub getrestricted {
 sub listhosts {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::BosServer->new;
+    my $result = AFS::Object::BosServer->new();
 
-    $self->operation( q{listhosts} );
+    $self->{operation} = "listhosts";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
 
     my @hosts = ();
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        chomp;
+	chomp;
 
-        if ( m{Cell name is (\S+)}msi ) {
-            $result->_setAttribute( cell => $1 );
-        }
+	if ( /Cell name is (\S+)/i ) {
+	    $result->_setAttribute( cell => $1 );
+	}
 
-        if ( m{Host \d+ is (\S+)}msi ) {
-            push @hosts, $1;
-        }
+	if ( /Host \d+ is \[?([^\]]*)\]?/i ) {
+	    push(@hosts,$1);
+	}
 
     }
 
     $result->_setAttribute( hosts => \@hosts );
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -202,43 +241,48 @@ sub listhosts {
 sub listkeys {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::BosServer->new;
+    my $result = AFS::Object::BosServer->new();
 
-    $self->operation( q{listkeys} );
+    $self->{operation} = "listkeys";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    return unless $self->_save_stderr();
 
-        chomp;
+    my $errors = 0;
 
-        if ( m{key (\d+)}ms ) {
+    $errors++ unless $self->_exec_cmds();
 
-            my $key = AFS::Object->new( index => $1 );
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-            if ( m{has cksum (\d+)}ms ) {
-                $key->_setAttribute( cksum => $1 );
-            } elsif ( m{is \'([^\']+)\'}ms ) {
-                $key->_setAttribute( value => $1 );
-            }
+	chomp;
 
-            $result->_addKey($key);
+	if ( /key (\d+)/ ) {
 
-        }
+	    my $key = AFS::Object->new( index => $1 );
 
-        if ( m{last changed on (.*)\.}ms ) {
-            $result->_setAttribute( keyschanged => $1 );
-        }
+	    if ( /has cksum (\d+)/ ) {
+		$key->_setAttribute( cksum => $1 );
+	    } elsif ( /is \'([^\']+)\'/ ) {
+		$key->_setAttribute( value => $1 );
+	    }
+
+	    $result->_addKey($key);
+
+	}
+
+	if ( /last changed on (.*)\./ ) {
+	    $result->_setAttribute( keyschanged => $1 );
+	}
 
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -246,151 +290,263 @@ sub listkeys {
 sub listusers {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::BosServer->new;
+    my $result = AFS::Object::BosServer->new();
 
-    $self->operation( q{listusers} );
+    $self->{operation} = "listusers";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    return unless $self->_save_stderr();
 
-        chomp;
+    my $errors = 0;
 
-        if ( m{^SUsers are: (.*)}ms ) {
-            $result->_setAttribute( susers => [split(/\s+/,$1)] );
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	chomp;
+
+	if ( /^SUsers are: (.*)/ ) {
+	    $result->_setAttribute( susers => [split(/\s+/,$1)] );
+	}
+    # Auristor uses separate lines for each users
+    # XXX: there's a type associated with AuriStor users, e.g.
+    # gss 'user@YOUR-CELL-NAME.COM'
+    # to maintain compatibility, provide both results
+    # Original did not include realm!
+    if ( /^SUsers are:/ ) {
+        my @users;
+        while ( defined($_ = $self->{handle}->getline()) ) {
+            next unless ( /(\S+)\s+'(\S+)'/ );
+            my $user = AFS::Object::User->new
+                (
+                 type      => $1,
+                 user      => $2,
+                );
+            $result->_addUser($user);
+            chomp;
+            (my $u = $2) =~ s/@\S+//;
+            push @users, $u unless ( grep /^$u$/, @users );
         }
+        $result->_setAttribute( susers => \@users );
+    }
 
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
 
+#
+# XXX -- we might want to provide parsing of the bos salvage output,
+# but for now, this is a non-parsed command.
+#
+
+# sub salvage {
+
+#     my $self = shift;
+#     my (%args) = @_;
+
+#     my $result = AFS::Object::BosServer->new();
+
+#     $self->{operation} = "salvage";
+
+#     return unless $self->_parse_arguments(%args);
+
+#     return unless $self->_save_stderr();
+
+#     my $errors = 0;
+
+#     $errors++ unless $self->_exec_cmds();
+
+#     while ( defined($_ = $self->{handle}->getline()) ) {
+
+
+
+#     }
+
+#     $errors++ unless $self->_reap_cmds();
+#     $errors++ unless $self->_restore_stderr();
+
+#     return if $errors;
+#     return $result;
+
+# }
+
 sub status {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::BosServer->new;
+    my $result = AFS::Object::BosServer->new();
 
-    $self->operation( q{status} );
+    $self->{operation} = "status";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
 
     my $instance = undef;
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        chomp;
+	chomp;
 
-        if ( m{inappropriate access}ms ) {
-            $result->_setAttribute( access => 1 );
-            next;
-        }
+	if ( /inappropriate access/ ) {
+	    $result->_setAttribute( access => 1 );
+	    next;
+	}
 
-        if ( m{Instance (\S+),}ms ) {
+	if ( /Instance (\S+),/ ) {
 
-            if ( defined $instance ) {
-                $result->_addInstance($instance);
-            }
+	    if ( defined $instance ) {
+		$result->_addInstance($instance);
+	    }
 
-            $instance = AFS::Object::Instance->new( instance => $1 );
+	    $instance = AFS::Object::Instance->new( instance => $1 );
 
-            #
-            # This is ugly, since the order and number of these
-            # strings varies.
-            #
-            if ( m{\(type is (\S+)\)}ms ) {
-                $instance->_setAttribute( type => $1 );
-            }
+	    #
+	    # This is ugly, since the order and number of these
+	    # strings varies.
+	    #
+	    if ( /\(type is (\S+)\)/ ) {
+		$instance->_setAttribute( type => $1 );
+	    }
 
-            if ( m{(disabled|temporarily disabled|temporarily enabled),}ms ) {
-                $instance->_setAttribute( state => $1 );
-            }
+	    if ( /(disabled|temporarily disabled|temporarily enabled),/ ) {
+		$instance->_setAttribute( state => $1 );
+	    }
 
-            if ( m{stopped for too many errors}ms ) {
-                $instance->_setAttribute( errorstop => 1 );
-            }
+	    if ( /stopped for too many errors/ ) {
+		$instance->_setAttribute( errorstop => 1 );
+	    }
 
-            if ( m{has core file}ms ) {
-                $instance->_setAttribute( core => 1 );
-            }
+	    if ( /has core file/ ) {
+		$instance->_setAttribute( core => 1 );
+	    }
 
-            if ( m{currently (.*)\.$}ms ) {
-                $instance->_setAttribute( status => $1 );
-            }
+	    if ( /currently (.*)\.$/ ) {
+		$instance->_setAttribute( status => $1 );
+	    }
 
-        }
+	}
 
-        if ( m{Auxiliary status is: (.*)\.$}ms ) {
-            $instance->_setAttribute( auxiliary => $1 );
-        }
+	if ( /Auxiliary status is: (.*)\.$/ ) {
+	    $instance->_setAttribute( auxiliary => $1 );
+	}
 
-        if ( m{Process last started at (.*) \((\d+) proc starts\)}ms ) {
-            $instance->_setAttribute(
-                startdate  => $1,
-                startcount => $2,
-            );
-        }
+	if ( /Process last started at (.*) \((\d+) proc starts\)/ ) {
+	    $instance->_setAttribute
+	      (
+	       startdate		=> $1,
+	       startcount		=> $2,
+	      );
+	}
 
-        if ( m{Last exit at (.*)}ms ) {
-            $instance->_setAttribute( exitdate => $1 );
-        }
+	if ( /Last exit at (.*)/ ) {
+	    $instance->_setAttribute( exitdate => $1 );
+	}
 
-        if ( m{Last error exit at ([^,]+),}ms ) {
+	if ( /Last error exit at ([^,]+),/ ) {
 
-            $instance->_setAttribute( errorexitdate => $1 );
+	    $instance->_setAttribute( errorexitdate => $1 );
 
-            if ( m{due to shutdown request}ms ) {
-                $instance->_setAttribute( errorexitdue => q{shutdown} );
-            }
+	    if ( /due to shutdown request/ ) {
+		$instance->_setAttribute( errorexitdue => 'shutdown' );
+	    }
 
-            if ( m{due to signal (\d+)}ms ) {
-                $instance->_setAttribute(
-                    errorexitdue    => q{signal},
-                    errorexitsignal => $1,
-                );
-            }
+	    if ( /due to signal (\d+)/ ) {
+		$instance->_setAttribute
+		  (
+		   errorexitdue 	=> 'signal',
+		   errorexitsignal	=> $1,
+		  );
+	    }
 
-            if ( m{by exiting with code (\d+)}ms ) {
-                $instance->_setAttribute(
-                    errorexitdue  => q{code},
-                    errorexitcode => $1,
-                );
-            }
+	    if ( /by exiting with code (\d+)/ ) {
+		$instance->_setAttribute
+		  (
+		   errorexitdue 	=> 'code',
+		   errorexitcode	=> $1,
+		  );
+	    }
 
-        }
+	}
 
-        if ( m{Command\s+(\d+)\s+is\s+\'(.*)\'}ms ) {
-            my $command = AFS::Object->new(
-                index   => $1,
-                command => $2,
-            );
-            $instance->_addCommand($command);
-        }
+	if ( /Command\s+(\d+)\s+is\s+\'(.*)\'/ ) {
+	    my $command = AFS::Object->new
+	      (
+	       index			=> $1,
+	       command			=> $2,
+	      );
+	    $instance->_addCommand($command);
+	}
 
-        if ( m{Notifier\s+is\s+\'(.*)\'}ms ) {
-            $instance->_setAttribute( notifier => $1 );
-        }
+	if ( /Notifier\s+is\s+\'(.*)\'/ ) {
+	    $instance->_setAttribute( notifier => $1 );
+	}
 
     }
 
     if ( defined $instance ) {
-        $result->_addInstance($instance);
+	$result->_addInstance($instance);
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
+    return $result;
+
+}
+
+sub whoami {
+
+    my $self = shift;
+    my (%args) = @_;
+
+    my $result = AFS::Object::BosServer->new();
+
+    $self->{operation} = "whoami";
+
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+    chomp;
+
+	next unless ( /Current identity is\s+(\S+)\s+'(\S+)'/ );
+    my $user = AFS::Object::User->new
+        (
+         type       => $1,
+         user       => $2,
+        );
+    $result->_addUser($user);
+
+    }
+
+    print Dumper( $result );
+
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
+
+    return if $errors;
     return $result;
 
 }

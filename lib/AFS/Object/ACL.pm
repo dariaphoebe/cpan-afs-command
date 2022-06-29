@@ -1,29 +1,35 @@
+
 package AFS::Object::ACL;
 
-use Moose;
+use strict;
 
-extends qw(AFS::Object);
-
-has q{_principals} => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
+our @ISA = qw(AFS::Object);
+our $VERSION = '1.99';
 
 sub getPrincipals {
-    return keys %{ shift->_principals };
+    my $self = shift;
+    return unless ref $self->{_principals};
+    return keys %{$self->{_principals}};
 }
 
 sub getRights {
-    return shift->_principals->{ shift(@_) };
+    my $self = shift;
+    my $principal = shift;
+    return unless ref $self->{_principals};
+    return $self->{_principals}->{lc($principal)};
 }
 
 sub getEntries {
-    return %{ shift->_principals };
+    my $self = shift;
+    return unless ref $self->{_principals};
+    return %{$self->{_principals}};
 }
 
 sub _addEntry {
-    # return shift->_principals->{ shift(@_) } = shift;
     my $self = shift;
     my $principal = shift;
     my $rights = shift;
-    $self->_principals->{ $principal } = $rights;
+    return $self->{_principals}->{$principal} = $rights;
 }
 
 1;

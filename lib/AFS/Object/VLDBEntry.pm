@@ -1,17 +1,24 @@
+
 package AFS::Object::VLDBEntry;
 
-use Moose;
+use strict;
 
-extends qw(AFS::Object);
-
-has q{_sites} => ( is => q{rw}, isa => q{ArrayRef}, default => sub { return []; } );
+our @ISA = qw(AFS::Object);
+our $VERSION = '1.99';
 
 sub getVLDBSites {
-    return @{ shift->_sites };
+    my $self = shift;
+    return unless ref $self->{_sites};
+    return @{$self->{_sites}};
 }
 
 sub _addVLDBSite {
-    return push @{ shift->_sites }, shift;
+    my $self = shift;
+    my $site = shift;
+    unless ( ref $site && $site->isa("AFS::Object::VLDBSite") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::VLDBSite object");
+    }
+    return push( @{$self->{_sites}}, $site );
 }
 
 1;

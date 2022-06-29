@@ -1,7 +1,9 @@
+
 package AFS::Object::Transaction;
 
-use Moose;
+use strict;
 
-extends qw(AFS::Object);
+our @ISA = qw(AFS::Object);
+our $VERSION = '1.99';
 
 1;

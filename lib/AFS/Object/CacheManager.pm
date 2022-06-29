@@ -1,69 +1,93 @@
+
 package AFS::Object::CacheManager;
 
-use Moose;
-use Carp;
+use strict;
 
-extends qw(AFS::Object);
-
-has q{_pathnames} => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
-has q{_cells}     => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
-has q{_servers}   => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
+our @ISA = qw(AFS::Object);
+our $VERSION = '1.99';
 
 sub getPathNames {
-    return keys %{ shift->_pathnames };
+    my $self = shift;
+    return unless ref $self->{_pathnames};
+    return keys %{$self->{_pathnames}};
 }
 
 sub getPaths {
-    return values %{ shift->_pathnames };
+    my $self = shift;
+    return unless ref $self->{_pathnames};
+    return values %{$self->{_pathnames}};
 }
 
 sub getPath {
-    return shift->_pathnames->{ shift(@_) };
+    my $self = shift;
+    my $path = shift;
+    return unless ref $self->{_pathnames};
+    return $self->{_pathnames}->{$path};
 }
 
 sub _addPath {
     my $self = shift;
     my $path = shift;
-    $path->path or croak q{Invalid path object};
-    return $self->_pathnames->{ $path->path } = $path;
+    unless ( ref $path && $path->isa("AFS::Object::Path") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::Path object");
+    }
+    return $self->{_pathnames}->{$path->path()} = $path;
 }
 
 sub getCellNames {
-    return keys %{ shift->_cells };
+    my $self = shift;
+    return unless ref $self->{_cells};
+    return keys %{$self->{_cells}};
 }
 
 sub getCells {
-    return values %{ shift->_cells };
+    my $self = shift;
+    return unless ref $self->{_cells};
+    return values %{$self->{_cells}};
 }
 
 sub getCell {
-    return shift->_cells->{ shift(@_) };
+    my $self = shift;
+    my $cell = shift;
+    return unless ref $self->{_cells};
+    return $self->{_cells}->{$cell};
 }
 
 sub _addCell {
     my $self = shift;
     my $cell = shift;
-    $cell->cell or croak q{Invalid cell object};
-    return $self->_cells->{ $cell->cell } = $cell;
+    unless ( ref $cell && $cell->isa("AFS::Object::Cell") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::Cell object");
+    }
+    return $self->{_cells}->{$cell->cell()} = $cell;
 }
 
 sub getServerNames {
-    return keys %{ shift->_servers };
+    my $self = shift;
+    return unless ref $self->{_servers};
+    return keys %{$self->{_servers}};
 }
 
 sub getServers {
-    return values %{ shift->_servers };
+    my $self = shift;
+    return unless ref $self->{_servers};
+    return values %{$self->{_servers}};
 }
 
 sub getServer {
-    return shift->_servers->{ shift(@_) };
+    my $self = shift;
+    my $server = shift;
+    return unless ref $self->{_servers};
+    return $self->{_servers}->{$server};
 }
 
 sub _addServer {
     my $self = shift;
     my $server = shift;
-    $server->server or croak q{Invalid server object};
-    return $self->_servers->{ $server->server } = $server;
+    unless ( ref $server && $server->isa("AFS::Object::Server") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::Server object");
+    }
+    return $self->{_servers}->{$server->server()} = $server;
 }
 
 1;

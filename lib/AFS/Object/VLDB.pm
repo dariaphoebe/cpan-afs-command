@@ -1,54 +1,79 @@
+
 package AFS::Object::VLDB;
 
-use Moose;
-use Carp;
+use strict;
 
-extends qw(AFS::Object);
-
-has q{_names} => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
-has q{_ids}   => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
+our @ISA = qw(AFS::Object);
+our $VERSION = '1.99';
 
 sub getVolumeNames {
-    return keys %{ shift->_names };
+    my $self = shift;
+    return unless ref $self->{_names};
+    return keys %{$self->{_names}};
 }
 
 sub getVolumeIds {
-    return keys %{ shift->_ids };
+    my $self = shift;
+    return unless ref $self->{_ids};
+    return keys %{$self->{_ids}};
 }
 
 sub getVLDBEntry {
 
     my $self = shift;
-    my %args = @_;
 
-    if ( exists $args{id} and exists $args{name} ) {
-	croak qq{Invalid arguments: both of 'id' or 'name' may not be specified};
+    my %args = ();
+
+    if ( $#_ == 0 ) {
+	if ( $^W ) {
+	    $self->_Carp("WARNING: getVLDBEntry(\$name) usage is deprecated\n" .
+			 "Use getVLDBENtryByName(\$name), or getVLDBERntry( name => \$name )\n");
+	}
+	$args{name} = shift;
+    } else {
+	%args = @_;
     }
 
-    if ( not exists $args{id} and not exists $args{name} )  {
-	croak qq{Invalid arguments: at least one of 'id' or 'name' must be specified};
+    if ( exists $args{id} && exists $args{name} ) {
+	$self->_Carp("Invalid arguments: both of 'id' or 'name' may not be specified");
+	return;
+    }
+
+    unless ( exists $args{id} || exists $args{name} )  {
+	$self->_Carp("Invalid arguments: at least one of 'id' or 'name' must be specified");
+	return;
     }
 
     if ( exists $args{id} ) {
-	return $self->_ids->{ $args{id} };
+	return unless ref $self->{_ids};
+	return $self->{_ids}->{$args{id}};
     }
 
     if ( exists $args{name} ) {
-	return $self->_names->{ $args{name} };
+	return unless ref $self->{_names};
+	return $self->{_names}->{$args{name}};
     }
 
 }
 
 sub getVLDBEntryByName {
-    return shift->_names->{ shift(@_) };
+    my $self = shift;
+    my $name = shift;
+    return unless ref $self->{_names};
+    return $self->{_names}->{$name};
 }
 
 sub getVLDBEntryById {
-    return shift->_ids->{ shift(@_) };
+    my $self = shift;
+    my $id = shift;
+    return unless ref $self->{_ids};
+    return $self->{_ids}->{$id};
 }
 
 sub getVLDBEntries {
-    return values %{ shift->_names };
+    my $self = shift;
+    return unless ref $self->{_names};
+    return values %{$self->{_names}};
 }
 
 sub _addVLDBEntry {
@@ -56,17 +81,17 @@ sub _addVLDBEntry {
     my $self = shift;
     my $entry = shift;
 
-    if ( not ref $entry or not $entry->isa( q{AFS::Object::VLDBEntry} ) ) {
-	croak qq{Invalid argument: must be an AFS::Object::VLDBEntry object};
+    unless ( ref $entry && $entry->isa("AFS::Object::VLDBEntry") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::VLDBEntry object");
     }
 
-    foreach my $id ( $entry->rwrite, $entry->ronly,
-		     $entry->backup, $entry->rclone ) {
+    foreach my $id ( $entry->rwrite(), $entry->ronly(),
+		     $entry->backup(), $entry->rclone() ) {
 	next unless $id; # Some, in fact most, of those won't exist
-	$self->_ids->{ $id } = $entry;
+	$self->{_ids}->{$id} = $entry;
     }
 
-    return $self->_names->{ $entry->name } = $entry;
+    return $self->{_names}->{$entry->name()} = $entry;
 
 }
 

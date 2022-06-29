@@ -1,29 +1,37 @@
+
 package AFS::Object::Instance;
 
-use Moose;
-use Carp;
+use strict;
 
-extends qw(AFS::Object);
-
-has q{_commands} => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
+our @ISA = qw(AFS::Object);
+our $VERSION = '1.99';
 
 sub getCommandIndexes {
-    return sort keys %{ shift->_commands };
+    my $self = shift;
+    return unless ref $self->{_commands};
+    return sort keys %{$self->{_commands}};
 }
 
 sub getCommands {
-    return values %{ shift->_commands };
+    my $self = shift;
+    return unless ref $self->{_commands};
+    return values %{$self->{_commands}};
 }
 
 sub getCommand {
-    return shift->_commands->{ shift(@_) };
+    my $self = shift;
+    my $index = shift;
+    return unless ref $self->{_commands};
+    return $self->{_commands}->{$index};
 }
 
 sub _addCommand {
     my $self = shift;
     my $command = shift;
-    defined( $command->index ) or croak q{Invalid command object};
-    return $self->_commands->{ $command->index } = $command;
+    unless ( ref $command && $command->isa("AFS::Object") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object object");
+    }
+    return $self->{_commands}->{$command->index()} = $command;
 }
 
 1;

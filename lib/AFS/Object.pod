@@ -31,10 +31,10 @@ AFS::Object object, or an object derived from it.
 This method takes no arguments, and returns a list of the attribute
 names available in the object.
 
-    my @attrs = $result->listAttributes;
+    my @attrs = $result->listAttributes();
     foreach my $attr ( @attrs ) {
 	my $value = $result->getAttribute($attr);
-	print qq{Key '$attr' has value '$value\n};
+	print "Key '$attr' has value '$value\n";
     }
 
 =head2 getAttribute
@@ -42,13 +42,13 @@ names available in the object.
 This methods takes a single argument, the name of an attribute, and
 returns the value of the attribute, if it exists in the object.
 
-    my $name = $result->getAttribute( q{name} );
+    my $name = $result->getAttribute('name');
 
 NOTE: Attributes may also be queried by calling the method of the same
 name.  If the attribute doesn't exist, then the method will just
 return a false value.  The above example is the same as:
 
-    my $name = $result->name;
+    my $name = $result->name();
 
 BEWARE: It is impossible to tell the difference between a non-existent
 attribute, and one with a false value using this method.  If attribute
@@ -60,9 +60,9 @@ hasAttribute method.
 This method takes no arguments, and returns the entire list of
 attributes as list of key/value pairs.
 
-    my %attrs = $result->getAttributes;
+    my %attrs = $result->getAttributes();
     while ( my ($key,$value) = each %attrs ) {
-	print qq{Key '$key' has value '$value'\n};
+	print "Key '$key' has value '$value'\n";
     }
 
 =head2 hasAttribute
@@ -71,7 +71,7 @@ This method takes a single argument, the name of a potentially
 available attribute, and returns a boolean true/false value if the
 attribute exists in the object.
 
-    if ( $result->hasAttribute( q{name} ) ) {
+    if ( $result->hasAttribute('name') ) {
        # Well, then it has a name attribute...
     }
 

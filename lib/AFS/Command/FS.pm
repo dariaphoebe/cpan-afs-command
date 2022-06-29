@@ -1,16 +1,12 @@
+
 package AFS::Command::FS;
 
-require 5.010;
+require 5.6.0;
 
-use Moose;
-use MooseX::Singleton;
+use strict;
 use English;
-use Carp;
 
-use feature q{switch};
-
-extends qw(AFS::Command::Base);
-
+use AFS::Command::Base;
 use AFS::Object;
 use AFS::Object::CacheManager;
 use AFS::Object::Path;
@@ -18,491 +14,398 @@ use AFS::Object::Cell;
 use AFS::Object::Server;
 use AFS::Object::ACL;
 
-sub getPathInfo {
+our @ISA = qw(AFS::Command::Base);
+our $VERSION = '1.99';
+
+sub checkservers {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $method = delete $args{method} ||
-        croak qq{Missing required argument: method\n};
+    my $result = AFS::Object::CacheManager->new();
 
-    my $pathkey = $method eq q{storebehind} ? q{files} : q{path};
+    $self->{operation} = "checkservers";
 
-    if ( ref $args{$pathkey} ) {
-        croak qq{Invalid argument: $pathkey is a reference\n};
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    my @servers = ();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	chomp;
+
+	if ( /The current down server probe interval is (\d+) secs/ ) {
+	    $result->_setAttribute( interval => $1 );
+	}
+
+	if ( /These servers are still down:/ ) {
+	    while ( defined($_ = $self->{handle}->getline()) ) {
+		s/^\s+//g;
+		s/\s+$//g;
+		push(@servers,$_);
+	    }
+	}
     }
 
-    my ($result) = $self->_paths_method( $method, %args )->getPaths;
+    $result->_setAttribute( servers => \@servers );
 
-    if ( $result->error ) {
-        croak $result->error;
-    }
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
 
 sub diskfree {
-    return shift->_paths_method( q{diskfree}, @_ );
+    my $self = shift;
+    return $self->_paths_method('diskfree',@_);
 }
 
 sub examine {
-    return shift->_paths_method( q{examine} ,@_ );
+    my $self = shift;
+    return $self->_paths_method('examine',@_);
+}
+
+sub getfid {
+    my $self = shift;
+    return $self->_paths_method('getfid',@_);
 }
 
 sub getcalleraccess {
-    return shift->_paths_method( q{getcalleraccess} ,@_ );
-}
-
-sub listacl {
-    return shift->_paths_method( q{listacl}, @_ );
+    my $self = shift;
+    return $self->_paths_method('getcalleraccess',@_);
 }
 
 sub listquota {
-    return shift->_paths_method( q{listquota}, @_ );
+    my $self = shift;
+    return $self->_paths_method('listquota',@_);
 }
 
 sub quota {
-    return shift->_paths_method( q{quota}, @_ );
+    my $self = shift;
+    return $self->_paths_method('quota',@_);
 }
 
 sub storebehind {
-    return shift->_paths_method( q{storebehind}, @_ );
-}
-
-sub whereis {
-    return shift->_paths_method( q{whereis}, @_ );
+    my $self = shift;
+    return $self->_paths_method('storebehind',@_);
 }
 
 sub whichcell {
-    return shift->_paths_method( q{whichcell}, @_ );
+    my $self = shift;
+    return $self->_paths_method('whichcell',@_);
+}
+
+sub listacl {
+    my $self = shift;
+    return $self->_paths_method('listacl',@_);
 }
 
 sub _paths_method {
 
     my $self = shift;
     my $operation = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::CacheManager->new;
+    my $result = AFS::Object::CacheManager->new();
 
-    $self->operation( $operation );
+    $self->{operation} = $operation;
 
-    my $default_asynchrony = undef;
+    my $pathkey = $operation eq 'storebehind' ? 'files' : 'path';
 
-    my $pathkey = $operation eq q{storebehind} ? q{files} : q{path};
+    return unless $self->_parse_arguments(%args);
 
-    $self->_parse_arguments(%args);
-    $self->_exec_commands( stderr => q{stdout} );
+    my $errors = 0;
 
-    my @paths = ref $args{$pathkey} eq q{ARRAY} ? @{$args{$pathkey}} : ($args{$pathkey});
+    $errors++ unless $self->_exec_cmds( stderr => 'stdout' );
+
+    my @paths = ref $args{$pathkey} eq 'ARRAY' ? @{$args{$pathkey}} : ($args{$pathkey});
     my %paths = map { $_ => 1 } @paths;
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    my $default = undef; # Used by storebehind
 
-        chomp;
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        next if m{^Volume Name}ms;
+	next if /^Volume Name/;
 
-        if ( m{Default store asynchrony is (\d+) kbytes}ms ) {
-            $default_asynchrony = $1;
-            next;
+	my $path = AFS::Object::Path->new();
+
+	if ( /fs: Invalid argument; it is possible that (.*) is not in AFS./ ||
+	     /fs: no such cell as \'(.*)\'/ ||
+	     /fs: File \'(.*)\' doesn\'t exist/ ||
+	     /fs: You don\'t have the required access rights on \'(.*)\'/ ) {
+
+	    $path->_setAttribute
+	      (
+	       path 		=> $1,
+	       error		=> $_,
+	      );
+	    delete $paths{$1};
+	    @paths = grep($_ ne $1,@paths);
+
+	} elsif ( $operation eq 'listacl' ) {
+
+		if ( /^Access list for (.*) is/ ) {
+		    $path->_setAttribute( path => $1 );
+		    delete $paths{$1};
+		    @paths = grep($_ ne $1,@paths);
+
+		    my $normal 		= AFS::Object::ACL->new();
+		    my $negative 	= AFS::Object::ACL->new();
+
+		    my $type = 0;
+
+		    while ( defined($_ = $self->{handle}->getline()) ) {
+
+			s/^\s+//g;
+			s/\s+$//g;
+			last if /^\s*$/;
+
+			$type = 1, next if /^Normal rights:/;
+			$type = -1, next if /^Negative rights:/;
+
+			my ($principal,$rights) 	= split;
+
+			if ( $type == 1 ) {
+			    $normal->_addEntry( $principal => $rights );
+			} elsif ( $type == -1 ) {
+			    $negative->_addEntry( $principal => $rights );
+			}
+
+		    }
+
+		    $path->_setACLNormal($normal);
+		    $path->_setACLNegative($negative);
+
+		}
+
+	    } elsif ( $operation eq 'whichcell' ) {
+
+		if ( /^File (\S+) lives in cell \'([^\']+)\'/ ) {
+
+		    $path->_setAttribute
+		      (
+		       path	=> $1,
+		       cell 	=> $2,
+		      );
+		    delete $paths{$1};
+		    @paths = grep($_ ne $1,@paths);
+
+		}
+
+	    } elsif ( $operation eq 'storebehind' ) {
+
+		if ( /Default store asynchrony is (\d+) kbytes/ ) {
+
+		    $default = $1;
+		    next;
+
+		} elsif ( /Will store (.*?) according to default./ ) {
+
+		    $path->_setAttribute
+		      (
+		       path 			=> $1,
+		       asynchrony 		=> 'default',
+		      );
+
+		    delete $paths{$1};
+		    @paths = grep($_ ne $1,@paths);
+
+		} elsif ( /Will store up to (\d+) kbytes of (.*?) asynchronously/ ) {
+
+		    $path->_setAttribute
+		      (
+		       path 			=> $2,
+		       asynchrony 		=> $1,
+		      );
+
+		    delete $paths{$2};
+		    @paths = grep($_ ne $2,@paths);
+
+		}
+
+	    } elsif ( $operation eq 'quota' ) {
+
+		if ( /^\s*(\d{1,2})%/ ) {
+
+		    $path->_setAttribute
+		      (
+		       path 			=> $paths[0],
+		       percent			=> $1,
+		      );
+		    delete $paths{$paths[0]};
+		    shift @paths;
+
+		}
+
+	    } elsif ( $operation eq 'getcalleraccess' ) {
+
+		if ( /^Callers access to (\S+) is (\S+)/ ) {
+
+		    $path->_setAttribute
+		      (
+		       path	=> $1,
+               rights => $2,
+		      );
+		    delete $paths{$1};
+		    @paths = grep($_ ne $1,@paths);
+
+		}
+
+	    } elsif ( $operation eq 'getfid' ) {
+
+		if ( /^File (\S+) \((\d+)\.(\d+)\.(\d+)\) located in cell (\S+)/ ) {
+
+		    $path->_setAttribute
+		      (
+		       path	=> $1,
+               volume => $2,
+               vnode =>$3,
+               unique => $4,
+		       cell 	=> $5,
+		      );
+		    delete $paths{$1};
+		    @paths = grep($_ ne $1,@paths);
+
+		}
+
+	    } elsif ( $operation eq 'listquota' ) {
+
+		#
+		# This is a bit lame.  We want to be lazy and split on white
+		# space, so we get rid of this one annoying instance.
+		#
+		s/no limit/nolimit/g;
+
+		my ($volname,$quota,$used,$percent,$partition) = split;
+
+		$quota = 0 if $quota eq "nolimit";
+		$percent =~ s/\D//g; # want numeric result
+		$partition =~ s/\D//g; # want numeric result
+
+		$path->_setAttribute
+		  (
+		   path				=> $paths[0],
+		   volname			=> $volname,
+		   quota			=> $quota,
+		   used				=> $used,
+		   percent			=> $percent,
+		   partition			=> $partition,
+		  );
+		delete $paths{$paths[0]};
+		shift @paths;
+
+	    } elsif ( $operation eq 'diskfree' ) {
+
+		my ($volname,$total,$used,$avail,$percent) = split;
+		$percent =~ s/%//g; # Don't need it -- want numeric result
+
+		$path->_setAttribute
+		  (
+		   path				=> $paths[0],
+		   volname			=> $volname,
+		   total			=> $total,
+		   used				=> $used,
+		   avail			=> $avail,
+		   percent			=> $percent,
+		  );
+		delete $paths{$paths[0]};
+		shift @paths;
+
+	    } elsif ( $operation eq 'examine' ) {
+
+        if ( /File (\S+) \(\S+\) contained in volume \d+/ ) {
+            next unless ( defined($_ = $self->{handle}->getline()) );
         }
 
-        my $path = AFS::Object::Path->new;
+		if ( /Volume status for vid = (\d+) named (\S+)/ ) {
 
-        if ( m{fs: Invalid argument; it is possible that (.*) is not in AFS.}ms ||
-             m{fs: no such cell as \'(.*)\'}ms ||
-             m{fs: File \'(.*)\' doesn\'t exist}ms ||
-             m{fs: You don\'t have the required access rights on \'(.*)\'}ms ) {
-            $path->_setAttribute( path  => $1, error => $_ );
-            delete $paths{$1};
-            @paths = grep { $_ ne $1 } @paths;
-            $result->_addPath($path);
-            next;
-        }
+		    $path->_setAttribute
+		      (
+		       path			=> $paths[0],
+		       id			=> $1,
+		       volname			=> $2,
+		      );
 
-        if ( $operation eq q{diskfree} ) {
-            my ($volname,$total,$used,$avail,$percent) = split;
-            $percent =~ s{\D}{}gms;
-            $path->_setAttribute(
-                path    => $paths[0],
-                volname => $volname,
-                total   => $total,
-                used    => $used,
-                avail   => $avail,
-                percent => $percent,
-            );
-            delete $paths{$paths[0]};
-            shift @paths;
-        }
+		    #
+		    # Looking at Transarc's code, we can safely assume we'll
+		    # get this output in the order shown. Note we ignore the
+		    # "Message of the day" and "Offline reason" output for
+		    # now.  Read until we hit a blank line.
+		    #
+		    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        if ( $operation eq q{examine} ) {
+			last if /^\s*$/;
 
-            if ( m{File (.*) \(\d+.(.*)\) contained in volume \d+}ms ) {
-                $path->_setAttribute( path => $1, fid  => $2 );
-                $_ = $self->_handle->getline;
-                chomp;
-            }
+			if ( /Current disk quota is (\d+|unlimited)/ ) {
+			    $path->_setAttribute
+			      (
+			       quota		=>  $1 eq "unlimited" ? 0 : $1,
+			      );
+			}
 
-            if ( m{Volume status for vid = (\d+) named (\S+)}ms ) {
+			if ( /Current blocks used are (\d+)/ ) {
+			    $path->_setAttribute( used => $1 );
+			}
 
-                if ( not $path->path ) {
-                    $path->_setAttribute( path => $paths[0] );
-                }
+			if ( /The partition has (\d+) blocks available out of (\d+)/ ) {
+			    $path->_setAttribute
+			      (
+			       avail		=> $1,
+			       total		=> $2,
+			      );
+			}
+		    }
 
-                $path->_setAttribute( id => $1, volname => $2 );
+		    delete $paths{$paths[0]};
+		    shift @paths;
 
-                # Note that we ignore the "Message of the day" and
-                # "Offline reason" output for now.  Read until we hit
-                # a blank line.
-                while ( defined($_ = $self->_handle->getline) ) {
+		}
 
-                    chomp;
-                    last if not $_;
-
-                    given ( $_ ) {
-                        when ( m{Current disk quota is (\d+|unlimited)}ms ) {
-                            $path->_setAttribute( quota => $1 eq q{unlimited} ? 0 : $1 );
-                        }
-                        when ( m{Current blocks used are (\d+)}ms ) {
-                            $path->_setAttribute( used => $1 );
-                        }
-                        when ( m{The partition has (\d+) blocks available out of (\d+)}ms ) {
-                            $path->_setAttribute( avail => $1, total => $2 );
-                        }
-                    }
-
-                }
-
-                delete $paths{$paths[0]};
-                shift @paths;
-
-            }
-
-        }
-
-        if ( $operation eq q{getcalleraccess} ) {
-            if ( m{Callers access to (.*) is (\S+)}ms ) {
-                $path->_setAttribute( path => $1, rights => $2 );
-                delete $paths{$1};
-            }
-        }
-
-        if ( $operation eq q{listacl} ) {
-
-            if ( m{^Access list for (.*) is}ms ) {
-
-                $path->_setAttribute( path => $1 );
-                delete $paths{$1};
-
-                my %acls = (
-                    normal   => AFS::Object::ACL->new,
-                    negative => AFS::Object::ACL->new,
-                );
-
-                my $type = q{};
-
-                while ( defined($_ = $self->_handle->getline) ) {
-
-                    chomp;
-                    s{^\s+}{}gms;
-                    s{\s+$}{}gms;
-                    last if not $_;
-
-                    if ( m{^(Normal|Negative) rights:}ms ) {
-                        $type = lc($1);
-                    } else {
-                        my ($principal,$rights) = split;
-                        $acls{$type}->_addEntry( $principal => $rights );
-                    }
-
-                }
-
-                $path->_setACLNormal( $acls{normal} );
-                $path->_setACLNegative( $acls{negative} );
-
-            }
-
-        }
-
-        if ( $operation eq q{listquota} ) {
-            s{no limit}{0}gms;
-            my ($volname,$quota,$used,$percent,$partition) = split;
-            $percent   =~ s{\D}{}gms;
-            $partition =~ s{\D}{}gms;
-            $path->_setAttribute(
-                path      => $paths[0],
-                volname   => $volname,
-                quota     => $quota,
-                used      => $used,
-                percent   => $percent,
-                partition => $partition,
-            );
-            delete $paths{$paths[0]};
-            shift @paths;
-        }
-
-        if ( $operation eq q{quota} ) {
-            if ( m{^\s*(\d{1,2})%}ms ) {
-                $path->_setAttribute(
-                    path    => $paths[0],
-                    percent => $1,
-                );
-                delete $paths{$paths[0]};
-                shift @paths;
-            }
-        }
-
-        if ( $operation eq q{storebehind} ) {
-            if ( m{Will store (.*?) according to default.}ms ) {
-                $path->_setAttribute(
-                    path       => $1,
-                    asynchrony => q{default},
-                );
-                delete $paths{$1};
-            } elsif ( m{Will store up to (\d+) kbytes of (.*?) asynchronously}ms ) {
-                $path->_setAttribute(
-                    path       => $2,
-                    asynchrony => $1,
-                );
-                delete $paths{$2};
-            }
-        }
-
-        if ( $operation eq q{whereis} ) {
-            if ( m{^File (.*) is on hosts? (.*)$}ms ) {
-                $path->_setAttribute(
-                    path  => $1,
-                    hosts => [split(/\s+/,$2)],
-                );
-                delete $paths{$1};
-            }
-        }
-
-        if ( $operation eq q{whichcell} ) {
-            if ( m{^File (\S+) lives in cell \'([^\']+)\'}ms ) {
-                $path->_setAttribute(
-                    path => $1,
-                    cell => $2,
-                );
-                delete $paths{$1};
-            }
-        }
-
-        if ( not $path->path ) {
-            croak qq{Failed to set path during operation $operation};
-        }
+	    }
 
         $result->_addPath($path);
 
+    }
+
+    if ( $operation eq 'storebehind' ) {
+
+	$result->_setAttribute( asynchrony => $default );
+
+	#
+	# This is ugly, but we get the default last, and it would be nice
+	# to put this value into the Path objects as well, rather than the
+	# string 'default'.
+	#
+	foreach my $path ( $result->getPaths() ) {
+	    if ( defined($path->asynchrony()) && $path->asynchrony() eq 'default' ) {
+		$path->_setAttribute( asynchrony => $default );
+	    }
+	}
     }
 
     foreach my $pathname ( keys %paths ) {
-        my $path = AFS::Object::Path->new(
-            path  => $pathname,
-            error => q{Unable to determine results},
-        );
-        $result->_addPath($path);
-    }
 
-    $self->_reap_commands( allowstatus => 1 );
+	my $path = AFS::Object::Path->new
+	  (
+	   path			=> $pathname,
+	   error		=> "Unable to determine results",
+	  );
 
-    if ( $operation eq q{storebehind} ) {
-
-        # This is ugly, but we get the default last, and it would be
-        # nice to put this value into the Path objects as well, rather
-        # than the string 'default'.
-
-        if ( not defined $default_asynchrony ) {
-            # It appears that fs storebehind, in older AFS versions,
-            # would always print the default line, but in more recent
-            # versions, the default is only printed if you provide by
-            # arguments.
-            $default_asynchrony = $self->_default_asynchrony;
-        }
-
-        $result->_setAttribute( asynchrony => $default_asynchrony );
-        foreach my $path ( $result->getPaths ) {
-            if ( $path->asynchrony and $path->asynchrony eq q{default} ) {
-                $path->_setAttribute( asynchrony => $default_asynchrony );
-            }
-        }
+	$result->_addPath($path);
 
     }
 
-    return $result;
+    $errors++ unless $self->_reap_cmds( allowstatus => 1 );
 
-}
-
-sub _default_asynchrony {
-
-    my $self = shift;
-
-    $self->operation( q{storebehind} );
-
-    $self->_parse_arguments;
-    $self->_save_stderr;
-    $self->_exec_commands;
-
-    my $default_asynchrony = undef;
-
-    while ( defined($_ = $self->_handle->getline) ) {
-        if ( m{Default store asynchrony is (\d+) kbytes}ms ) {
-            $default_asynchrony = $1;
-        }
-    }
-
-    $self->_restore_stderr;
-    $self->_reap_commands;
-
-    if ( not defined $default_asynchrony ) {
-        croak qq{Unable to determine default value of asynchrony};
-    }
-
-    return $default_asynchrony;
-
-}
-
-# NOTE: This *should* be a _paths_method command, however, getfid has
-# some serious issues.
-
-sub getfid {
-
-    my $self = shift;
-    my %args = @_;
-
-    my $result = AFS::Object::CacheManager->new;
-
-    $self->operation( q{getfid} );
-
-    $self->_parse_arguments(%args);
-    $self->_exec_commands( stderr => q{stdout} );
-    
-    my @paths = ref $args{path} eq q{ARRAY} ? @{$args{path}} : ($args{path});
-    my %paths = map { $_ => 1 } @paths;
-
-    while ( defined($_ = $self->_handle->getline) ) {
-
-        chomp;
-
-        my $path = AFS::Object::Path->new;
-
-        #
-        # NOTE: As of OpenAFS 1.5.77, getfid does NOT return this
-        # information.  This will be patched, but most fs binaries
-        # will NOT generate this.
-        #
-        if ( m{fs: Invalid argument; it is possible that (.*) is not in AFS.}ms ||
-             m{fs: no such cell as \'(.*)\'}ms ||
-             m{fs: File \'(.*)\' doesn\'t exist}ms ||
-             m{fs: You don\'t have the required access rights on \'(.*)\'}ms ) {
-            $path->_setAttribute( path  => $1, error => $_ );
-        } elsif ( m{File (.*) \((\d+)\.(\d+)\.(\d+)\) contained in volume \d+}ms ) {
-            $path->_setAttribute(
-                path   => $1,
-                volume => $2,
-                vnode  => $3,
-                unique => $4,
-            );
-        } elsif ( m{File (.*) \((\d+)\.(\d+)\.(\d+)\) located in cell (\S+)}ms ) {
-            $path->_setAttribute(
-                path   => $1,
-                volume => $2,
-                vnode  => $3,
-                unique => $4,
-                cell   => $5,
-            );
-        }
-
-        if ( $path->path ) {
-            delete $paths{ $path->path };
-            $result->_addPath($path);
-        }
-        
-    }
-
-    foreach my $pathname ( keys %paths ) {
-        my $path = AFS::Object::Path->new(
-            path  => $pathname,
-            error => q{Unable to determine results},
-        );
-        $result->_addPath($path);
-    }
-
-    # NOTE: Also as of OpenAFS 1.5.77, getfid always exits 0, but this
-    # is also being patched.
-    $self->_reap_commands( allowstatus => 1 );
-
-    return $result;
-
-}
-
-sub bypassthreshold {
-
-    my $self = shift;
-    my %args = @_;
-
-    my $result = AFS::Object::CacheManager->new;
-
-    $self->operation( q{bypassthreshold} );
-
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
-
-    while ( defined($_ = $self->_handle->getline) ) {
-        chomp;
-        if ( m{Cache bypass threshold (\S+)}ms ) {
-            $result->_setAttribute( bypassthreshold => $1 );
-        }
-    }
-
-    $self->_restore_stderr;
-    $self->_reap_commands;
-
-    return $result;
-
-}
-
-sub checkservers {
-
-    my $self = shift;
-    my %args = @_;
-
-    my $result = AFS::Object::CacheManager->new;
-
-    $self->operation( q{checkservers} );
-
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
-
-    my @servers = ();
-
-    while ( defined($_ = $self->_handle->getline) ) {
-
-        chomp;
-
-        if ( m{The current down server probe interval is (\d+) secs}ms ) {
-            $result->_setAttribute( interval => $1 );
-        }
-
-        if ( m{These servers are still down:}ms ) {
-            while ( defined($_ = $self->_handle->getline) ) {
-                chomp;
-                s{^\s+}{}gms;
-                s{\s+$}{}gms;
-                push @servers, $_;
-            }
-        }
-    }
-
-    $result->_setAttribute( servers => \@servers );
-
-    $self->_restore_stderr;
-    $self->_reap_commands;
-
+    return if $errors;
     return $result;
 
 }
@@ -510,48 +413,60 @@ sub checkservers {
 sub exportafs {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::CacheManager->new;
+    my $result = AFS::Object->new();
 
-    $self->operation( q{exportafs} );
+    $self->{operation} = "exportafs";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        given ( $_ ) {
-            when ( m{translator is (currently )?enabled}ms ) {
-                $result->_setAttribute( enabled => 1 );
-            }
-            when ( m{translator is disabled}ms ) {
-                $result->_setAttribute( enabled => 0 );
-            }
-            when ( m{convert owner mode bits}ms ) {
-                $result->_setAttribute( convert => 1 );
-            }
-            when ( m{strict unix}ms ) {
-                $result->_setAttribute( convert => 0 );
-            }
-            when ( m{strict \'?passwd sync\'?}ms ) {
-                $result->_setAttribute( uidcheck => 1 );
-            }
-            when ( m{no \'?passwd sync\'?}ms ) {
-                $result->_setAttribute( uidcheck => 0 );
-            }
-            when ( m{allow mounts}msi ) {
-                $result->_setAttribute( submounts => 1 );
-            }
-            when ( m{Only mounts}msi ) {
-                $result->_setAttribute( submounts => 0 );
-            }
-        }
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	/translator is (currently )?enabled/ && do {
+	    $result->_setAttribute( enabled => 1 );
+	};
+
+	/translator is disabled/ && do {
+	    $result->_setAttribute( enabled => 0 );
+	};
+
+	/convert owner mode bits/ && do {
+	    $result->_setAttribute( convert => 1 );
+	};
+
+	/strict unix/ && do {
+	    $result->_setAttribute( convert => 0 );
+	};
+
+	/strict \'?passwd sync\'?/ && do {
+	    $result->_setAttribute( uidcheck => 1 );
+	};
+
+	/no \'?passwd sync\'?/ && do {
+	    $result->_setAttribute( uidcheck => 0 );
+	};
+
+	/allow mounts/i && do {
+	    $result->_setAttribute( submounts => 1 );
+	};
+
+	/Only mounts/i && do {
+	    $result->_setAttribute( submounts => 0 );
+	};
+
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -559,25 +474,34 @@ sub exportafs {
 sub getcacheparms {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::CacheManager->new;
+    my $result = AFS::Object::CacheManager->new();
 
-    $self->operation( q{getcacheparms} );
+    $self->{operation} = "getcacheparms";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        if ( m{using (\d+) of the cache.s available (\d+) 1K}ms ) {
-            $result->_setAttribute( used  => $1, avail => $2 );
-        }
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+	if ( /using (\d+) of the cache.s available (\d+) 1K/ ) {
+	    $result->_setAttribute
+	      (
+	       used			=> $1,
+	       avail			=> $2,
+	      );
+	}
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -585,29 +509,37 @@ sub getcacheparms {
 sub getcellstatus {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::CacheManager->new;
+    my $result = AFS::Object::CacheManager->new();
 
-    $self->operation( q{getcellstatus} );
+    $self->{operation} = "getcellstatus";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        if ( m{Cell (\S+) status: (no )?setuid allowed}ms ) {
-            my $cell = AFS::Object::Cell->new(
-                cell   => $1,
-                status => $2 ? 0 : 1,
-            );
-            $result->_addCell($cell);
-        }
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	if ( /Cell (\S+) status: (no )?setuid allowed/ ) {
+	    my $cell = AFS::Object::Cell->new
+	      (
+	       cell			=> $1,
+	       status			=> $2 ? 0 : 1,
+	      );
+	    $result->_addCell($cell);
+	}
+
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -615,30 +547,35 @@ sub getcellstatus {
 sub getclientaddrs {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::CacheManager->new;
+    my $result = AFS::Object::CacheManager->new();
 
-    $self->operation( q{getclientaddrs} );
+    $self->{operation} = "getclientaddrs";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
 
     my @addresses = ();
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        chomp;
-        s{^\s+}{}ms;
-        s{\s+$}{}ms;
-        push @addresses, $_;
+    while ( defined($_ = $self->{handle}->getline()) ) {
+	chomp;
+	s/^\s+//;
+	s/\s+$//;
+	push(@addresses,$_);
     }
 
     $result->_setAttribute( addresses => \@addresses );
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -646,25 +583,32 @@ sub getclientaddrs {
 sub getcrypt {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::CacheManager->new;
+    my $result = AFS::Object::CacheManager->new();
 
-    $self->operation( q{getcrypt} );
+    $self->{operation} = "getcrypt";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        if ( m{Security level is currently (crypt|clear)}ms ) {
-            $result->_setAttribute( crypt => $1 eq q{crypt} ? 1 : 0 );
-        }
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	if ( /Security level is currently (crypt|clear)/ ) {
+	    $result->_setAttribute( crypt => ($1 eq 'crypt' ? 1 : 0) );
+	}
+
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -672,36 +616,41 @@ sub getcrypt {
 sub getserverprefs {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::CacheManager->new;
+    my $result = AFS::Object::CacheManager->new();
 
-    $self->operation( q{getserverprefs} );
+    $self->{operation} = "getserverprefs";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    return unless $self->_save_stderr();
 
-        chomp;
-        s{^\s+}{}gms;
-        s{\s+$}{}gms;
+    my $errors = 0;
 
-        my ($name,$preference) = split;
+    $errors++ unless $self->_exec_cmds();
 
-        my $server = AFS::Object::Server->new(
-            server     => $name,
-            preference => $preference,
-        );
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        $result->_addServer($server);
+	s/^\s+//g;
+	s/\s+$//g;
+
+	my ($name,$preference) = split;
+
+	my $server = AFS::Object::Server->new
+	  (
+	   server		=> $name,
+	   preference		=> $preference,
+	  );
+
+	$result->_addServer($server);
 
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -709,30 +658,37 @@ sub getserverprefs {
 sub listaliases {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::CacheManager->new;
+    my $result = AFS::Object::CacheManager->new();
 
-    $self->operation( q{listaliases} );
+    $self->{operation} = "listaliases";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        chomp;
-        if ( m{Alias (.*) for cell (.*)}ms ) {
-            my $cell = AFS::Object::Cell->new(
-                cell  => $2,
-                alias => $1,
-            );
-            $result->_addCell($cell);
-        }
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	if ( /Alias (.*) for cell (.*)/ ) {
+	    my $cell = AFS::Object::Cell->new
+	      (
+	       cell			=> $2,
+	       alias			=> $1,
+	      );
+	    $result->_addCell($cell);
+	}
+
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -740,30 +696,37 @@ sub listaliases {
 sub listcells {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::CacheManager->new;
+    my $result = AFS::Object::CacheManager->new();
 
-    $self->operation( q{listcells} );
+    $self->{operation} = "listcells";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        chomp;
-        if ( m{^Cell (\S+) on hosts (.*)\.$}ms ) {
-            my $cell = AFS::Object::Cell->new(
-                cell    => $1,
-                servers => [split(/\s+/,$2)],
-            );
-            $result->_addCell($cell);
-        }
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	if ( /^Cell (\S+) on hosts (.*)\.$/ ) {
+	    my $cell = AFS::Object::Cell->new
+	      (
+	       cell			=> $1,
+	       servers			=> [split(/\s+/,$2)],
+	      );
+	    $result->_addCell($cell);
+	}
+
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -771,77 +734,74 @@ sub listcells {
 sub lsmount {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::CacheManager->new;
+    my $result = AFS::Object::CacheManager->new();
 
-    $self->operation( q{lsmount} );
+    $self->{operation} = "lsmount";
 
-    $self->_parse_arguments(%args);
-    $self->_exec_commands( stderr => q{stdout} );
+    return unless $self->_parse_arguments(%args);
 
-    my @dirs = ref $args{dir} eq q{ARRAY} ? @{$args{dir}} : ($args{dir});
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds( stderr => 'stdout' );
+
+    my @dirs = ref $args{dir} eq 'ARRAY' ? @{$args{dir}} : ($args{dir});
     my %dirs = map { $_ => 1 } @dirs;
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        chomp;
-        my $current = shift @dirs;
-        delete $dirs{$current};
+	my $current = shift @dirs;
+	delete $dirs{$current};
 
-        my $path = AFS::Object::Path->new( path => $current );
+	my $path = AFS::Object::Path->new( path => $current );
 
-        given ( $_ ) {
+	if ( /fs: Can.t read target name/ ) {
+	    $path->_setAttribute( error => $_ );
+	} elsif ( /fs: File '.*' doesn't exist/ ) {
+	    $path->_setAttribute( error => $_ );
+	} elsif ( /fs: you may not use \'.\'/ ) {
+	    $_ .= $self->{handle}->getline();
+	    $path->_setAttribute( error => $_ );
+	} elsif ( /\'(.*?)\' is not a mount point/ ) {
+	    $path->_setAttribute( error => $_ );
+	} elsif ( /^\'(.*?)\'.*?\'(.*?)\'$/ ) {
 
-            when ( m{fs: Can.t read target name}ms ) {
-                $path->_setAttribute( error => $_ );
-            }
-            when ( m{fs: File '.*' doesn't exist}ms ) {
-                $path->_setAttribute( error => $_ );
-            }
-            when ( m{fs: you may not use \'.\'}ms ) {
-                $_ .= $self->_handle->getline;
-                $path->_setAttribute( error => $_ );
-            }
-            when ( m{\'(.*?)\' is not a mount point}ms ) {
-                $path->_setAttribute( error => $_ );
-            }
+	    my ($dir,$mount) = ($1,$2);
 
-            when ( m{^\'(.*?)\'.*?\'(.*?)\'$}ms ) {
+	    $path->_setAttribute( symlink => 1 ) if /symbolic link/;
+	    $path->_setAttribute( readwrite => 1 ) if $mount =~ /^%/;
+	    $mount =~ s/^(%|\#)//;
 
-                my ($dir,$mount) = ($1,$2);
+	    my ($volname,$cell) = reverse split(/:/,$mount);
 
-                $path->_setAttribute( symlink => 1 ) if m{symbolic link}ms;
-                $path->_setAttribute( readwrite => 1 ) if $mount =~ m{^%}ms;
-                $mount =~ s{^(%|\#)}{}ms;
+	    $path->_setAttribute( volname => $volname );
+	    $path->_setAttribute( cell => $cell) if $cell;
 
-                my ($volname,$cell) = reverse split( m{:}msx, $mount );
+	} else {
 
-                $path->_setAttribute( volname => $volname );
-                $path->_setAttribute( cell => $cell) if $cell;
+	    $self->_Carp("fs lsmount: Unrecognized output: '$_'");
+	    $errors++;
+	    next;
 
-            }
+	}
 
-            default {
-                croak qq{fs lsmount: Unrecognized output: '$_'};
-            }
-
-        }
-
-        $result->_addPath($path);
+	$result->_addPath($path);
 
     }
 
     foreach my $dir ( keys %dirs ) {
-        my $path = AFS::Object::Path->new(
-            path  => $dir,
-            error => q{Unable to determine results},
-        );
+        my $path = AFS::Object::Path->new
+          (
+           path			=> $dir,
+           error		=> "Unable to determine results",
+          );
         $result->_addPath($path);
     }
 
-    $self->_reap_commands( allowstatus => 1 );
+    $errors++ unless $self->_reap_cmds( allowstatus => 1 );
 
+    return if $errors;
     return $result;
 
 }
@@ -850,94 +810,136 @@ sub lsmount {
 # This is deprecated in newer versions of OpenAFS
 #
 sub monitor {
-    croak qq{fs monitor: This operation is deprecated and no longer supported};
+    my $self = shift;
+    $self->_Carp("fs monitor: This operation is deprecated and no longer supported");
+    return;
 }
 
 sub sysname {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::CacheManager->new;
+    my $result = AFS::Object::CacheManager->new();
 
-    $self->operation( q{sysname} );
+    $self->{operation} = "sysname";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
 
     my @sysname = ();
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        chomp;
-
-        if ( m{Current sysname is \'?([^\']+)\'?}ms ) {
-            $result->_setAttribute( sysname => $1 );
-        } elsif ( s{Current sysname list is }{}ms ) {
-            while ( s{\'([^\']+)\'\s*}{}ms ) {
-                push @sysname, $1;
-            }
-            $result->_setAttribute( sysnames => \@sysname );
-            $result->_setAttribute( sysname => $sysname[0] );
-        }
+	if ( /Current sysname is \'?([^\']+)\'?/ ) {
+	    $result->_setAttribute( sysname => $1 );
+	} elsif ( s/Current sysname list is // ) {
+	    while ( s/\'([^\']+)\'\s*// ) {
+		push(@sysname,$1);
+	    }
+	    $result->_setAttribute( sysnames => \@sysname );
+	    $result->_setAttribute( sysname => $sysname[0] );
+	}
 
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
 
-sub uuid {
+sub whereis {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    if ( $self->supportsArgumentRequired( qw( uuid generate ) ) ) {
-        return $self->_uuid_simple(%args);
-    } else {
-        return $self->_uuid_complex(%args);
-    }
+    my $result = AFS::Object::CacheManager->new();
 
-}
+    $self->{operation} = "whereis";
 
-sub _uuid_simple {
-    my $self = shift;
-    $self->operation( q{uuid} );
-    $self->_parse_arguments(@_);
-    $self->_exec_commands( stderr => q{stdout} );
-    $self->_parse_output;
-    $self->_reap_commands;
-    return 1;
-}
+    return unless $self->_parse_arguments(%args);
 
-sub _uuid_complex {
+    my $errors = 0;
 
-    my $self = shift;
-    my %args = @_;
+    $errors++ unless $self->_exec_cmds( stderr => 'stdout' );
 
-    my $result = AFS::Object::CacheManager->new;
+    my @paths = ref $args{path} eq 'ARRAY' ? @{$args{path}} : ($args{path});
+    my %paths = map { $_ => 1 } @paths;
 
-    $self->operation( q{uuid} );
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+	PATH:
+    my $path = AFS::Object::Path->new();
 
+	if ( /fs: Invalid argument; it is possible that (.*) is not in AFS./ ||
+	     /fs: no such cell as \'(.*)\'/ ||
+	     /fs: File \'(.*)\' doesn\'t exist/ ||
+	     /fs: You don\'t have the required access rights on \'(.*)\'/ ) {
+        $path->_setAttribute( path => $1, error => $_ );
+        delete $paths{$1};
+        @paths = grep($_ ne $1,@paths);
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        chomp;
-        if ( m{UUID: (\S+)}ms ) {
-            $result->_setAttribute( uuid => $1 );
+    } elsif ( /^File (.*) is on hosts? (.*)$/ ) {
+
+        $path->_setAttribute(
+            path            => $1,
+            hosts			=> [split(/\s+/,$2)],
+            );
+        delete $paths{$1};
+        @paths = grep($_ ne $1,@paths);
+
+    # AuriStor format
+    # File /afs/.your-cell-name.com/demo is on host:
+    #         afs.your-cell-name.com:7000
+    } elsif ( /^File (.*) is on hosts?:$/ ) {
+        my $p = $1;
+        my @hosts;
+        while ( defined($_ = $self->{handle}->getline()) ) {
+            unless ( /^\s*(\S+):\d+\s*$/ ) {
+                $path->_setAttribute(
+                    path            => $p,
+                    hosts			=> \@hosts,
+                    );
+                $result->_addPath($path);
+                delete $paths{$p};
+                @paths = grep($_ ne $1,@paths);
+                goto PATH;
+            }
+            push @hosts, $1;
         }
+        $path->_setAttribute(
+            path            => $p,
+            hosts			=> \@hosts,
+            );
+        delete $paths{$p};
+        @paths = grep($_ ne $1,@paths);
+
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+	$result->_addPath($path);
 
+    }
+
+    foreach my $path ( keys %paths ) {
+        my $path = AFS::Object::Path->new
+          (
+           path			=> $path,
+           error		=> "Unable to determine results",
+          );
+        $result->_addPath($path);
+    }
+
+    $errors++ unless $self->_reap_cmds( allowstatus => 1 );
+
+    return if $errors;
     return $result;
 
 }
@@ -945,24 +947,29 @@ sub _uuid_complex {
 sub wscell {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::CacheManager->new;
+    my $result = AFS::Object::CacheManager->new();
 
-    $self->operation( q{wscell} );
+    $self->{operation} = "wscell";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        next if not m{belongs to cell\s+\'(.*)\'}ms;
-        $result->_setAttribute( cell => $1 );
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+	next unless /belongs to cell\s+\'(.*)\'/;
+	$result->_setAttribute( cell => $1 );
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }

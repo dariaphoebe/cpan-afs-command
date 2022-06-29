@@ -1,54 +1,66 @@
+
 package AFS::Object::PTServer;
 
-use Moose;
-use Carp;
+use strict;
 
-extends qw(AFS::Object);
-
-has q{_groups_byname} => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
-has q{_groups_byid}   => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
-has q{_users_byname}  => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
-has q{_users_byid}    => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
+our @ISA = qw(AFS::Object);
+our $VERSION = '1.99';
 
 sub getGroupNames {
-    return keys %{ shift->_groups_byname };
+    my $self = shift;
+    return unless ref $self->{_groups} && ref $self->{_groups}->{_byName};
+    return keys %{$self->{_groups}->{_byName}};
 }
 
 sub getGroupIds {
-    return keys %{ shift->_groups_byid };
+    my $self = shift;
+    return unless ref $self->{_groups} && ref $self->{_groups}->{_byId};
+    return keys %{$self->{_groups}->{_byId}};
 }
 
 sub getGroups {
-    return values %{ shift->_groups_byname };
+    my $self = shift;
+    return unless ref $self->{_groups} && ref $self->{_groups}->{_byName};
+    return values %{$self->{_groups}->{_byName}};
 }
 
 sub getGroupByName {
-    return shift->_groups_byname->{ shift(@_) };
+    my $self = shift;
+    my $name = shift;
+    return unless ref $self->{_groups} && ref $self->{_groups}->{_byName};
+    return $self->{_groups}->{_byName}->{lc($name)};
 }
 
 sub getGroupById {
-    return shift->_groups_byid->{ shift(@_) };
+    my $self = shift;
+    my $id = shift;
+    return unless ref $self->{_groups} && ref $self->{_groups}->{_byId};
+    return $self->{_groups}->{_byId}->{$id};
 }
 
 sub getGroup {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
     if ( exists $args{id} && exists $args{name} ) {
-        croak qq{Invalid arguments: both of 'id' or 'name' may not be specified};
+	$self->_Carp("Invalid arguments: both of 'id' or 'name' may not be specified");
+	return;
     }
 
     unless ( exists $args{id} || exists $args{name} )  {
-        croak qq{Invalid arguments: at least one of 'id' or 'name' must be specified};
+	$self->_Carp("Invalid arguments: at least one of 'id' or 'name' must be specified");
+	return;
     }
 
     if ( exists $args{id} ) {
-        return $self->_groups_byid->{ $args{id} };
+	return unless ref $self->{_groups} && ref $self->{_groups}->{_byId};
+	return $self->{_groups}->{_byId}->{$args{id}};
     }
 
     if ( exists $args{name} ) {
-        return $self->_groups_byname->{ $args{name} };
+	return unless ref $self->{_groups} && ref $self->{_groups}->{_byName};
+	return $self->{_groups}->{_byName}->{lc($args{name})};
     }
 
 }
@@ -58,56 +70,85 @@ sub _addGroup {
     my $self = shift;
     my $group = shift;
 
-    if ( not ref $group or not $group->isa( q{AFS::Object::Group} ) ) {
-        croak qq{Invalid argument: must be an AFS::Object::Group object};
+    unless ( ref $group && $group->isa("AFS::Object::Group") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::Group object");
     }
 
-    $self->_groups_byname->{ $group->name } = $group;
-    $self->_groups_byid->{ $group->id } = $group;
+    if ( $group->hasAttribute('name') ) {
+	my $name = $group->name();
+	$self->{_groups}->{_byName}->{$name} = $group;
+    } else {
+	$self->_Croak("Group has no name attribute!!\n" .
+		      Data::Dumper->Dump([$group],['group']));
+    }
+
+    if ( $group->hasAttribute('id') ) {
+	my $id = $group->id();
+	$self->{_groups}->{_byId}->{$id} = $group;
+    } else {
+	$self->_Croak("Group has no id attribute!!\n" .
+		      Data::Dumper->Dump([$group],['group']));
+    }
 
     return 1;
 
 }
 
 sub getUserNames {
-    return keys %{ shift->_users_byname };
+    my $self = shift;
+    return unless ref $self->{_users} && ref $self->{_users}->{_byName};
+    return keys %{$self->{_users}->{_byName}};
 }
 
 sub getUserIds {
-    return keys %{ shift->_users_byid };
+    my $self = shift;
+    return unless ref $self->{_users} && ref $self->{_users}->{_byId};
+    return keys %{$self->{_users}->{_byId}};
 }
 
 sub getUsers {
-    return values %{ shift->_users_byname };
+    my $self = shift;
+    return unless ref $self->{_users} && ref $self->{_users}->{_byName};
+    return values %{$self->{_users}->{_byName}};
 }
 
 sub getUserByName {
-    return shift->_users_byname->{ shift(@_) };
+    my $self = shift;
+    my $name = shift;
+    return unless ref $self->{_users} && ref $self->{_users}->{_byName};
+    return $self->{_users}->{_byName}->{lc($name)};
 }
 
 sub getUserById {
-    return shift->_users_byid->{ shift(@_) };
+    my $self = shift;
+    my $id = shift;
+    return unless ref $self->{_users} && ref $self->{_users}->{_byId};
+    return $self->{_users}->{_byId}->{$id};
 }
 
 sub getUser {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
     if ( exists $args{id} && exists $args{name} ) {
-        croak qq{Invalid arguments: both of 'id' or 'name' may not be specified};
+	$self->_Carp("Invalid arguments: both of 'id' or 'name' may not be specified");
+	return;
     }
 
     unless ( exists $args{id} || exists $args{name} )  {
-        croak qq{Invalid arguments: at least one of 'id' or 'name' must be specified};
+	$self->_Carp("Invalid arguments: at least one of 'id' or 'name' must be specified");
+	return;
     }
 
     if ( exists $args{id} ) {
-        return $self->_users_byid->{ $args{id} };
+	return unless ref $self->{_users} && ref $self->{_users}->{_byId};
+	return $self->{_users}->{_byId}->{$args{id}};
     }
 
     if ( exists $args{name} ) {
-        return $self->_users_byname->{ $args{name} };
+	return unless ref $self->{_users} && ref $self->{_users}->{_byName};
+	return $self->{_users}->{_byName}->{lc($args{name})};
     }
 
 }
@@ -117,12 +158,25 @@ sub _addUser {
     my $self = shift;
     my $user = shift;
 
-    if ( not ref $user or not $user->isa( q{AFS::Object::User} ) ) {
-        croak qq{Invalid argument: must be an AFS::Object::User object};
+    unless ( ref $user && $user->isa("AFS::Object::User") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::User object");
     }
 
-    $self->_users_byname->{ $user->name } = $user;
-    $self->_users_byid->{ $user->id } = $user;
+    if ( $user->hasAttribute('name') ) {
+	my $name = $user->name();
+	$self->{_users}->{_byName}->{$name} = $user;
+    } else {
+	$self->_Croak("User has no name attribute!!\n" .
+		      Data::Dumper->Dump([$user],['user']));
+    }
+
+    if ( $user->hasAttribute('id') ) {
+	my $id = $user->id();
+	$self->{_users}->{_byId}->{$id} = $user;
+    } else {
+	$self->_Croak("User has no id attribute!!\n" .
+		      Data::Dumper->Dump([$user],['user']));
+    }
 
     return 1;
 

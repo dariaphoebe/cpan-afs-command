@@ -1,27 +1,38 @@
+
 package AFS::Object::Volume;
 
-use Moose;
+use strict;
 
-extends qw(AFS::Object);
-
-has q{_vldbentry} => ( is => q{rw}, isa => q{AFS::Object::VLDBEntry} );
-has q{_headers}   => ( is => q{rw}, isa => q{ArrayRef[AFS::Object::VolumeHeader]},
-                       default => sub { return []; } );
+our @ISA = qw(AFS::Object);
+our $VERSION = '1.99';
 
 sub getVolumeHeaders {
-    return @{ shift->_headers };
+    my $self = shift;
+    return unless ref $self->{_headers};
+    return @{$self->{_headers}};
 }
 
 sub _addVolumeHeader {
-    return push @{ shift->_headers }, shift;
+    my $self = shift;
+    my $header = shift;
+    unless ( ref $header && $header->isa("AFS::Object::VolumeHeader") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::VolumeHeader object");
+    }
+    return push( @{$self->{_headers}}, $header );
 }
 
 sub getVLDBEntry {
-    return shift->_vldbentry;
+    my $self = shift;
+    return $self->{_vldbentry};
 }
 
 sub _addVLDBEntry {
-    return shift->_vldbentry( shift );
+    my $self = shift;
+    my $entry = shift;
+    unless ( ref $entry && $entry->isa("AFS::Object::VLDBEntry") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::VLDBEntry object");
+    }
+    return $self->{_vldbentry} = $entry;
 }
 
 1;

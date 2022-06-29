@@ -1,26 +1,32 @@
+
 package AFS::Object::Principal;
 
-use Moose;
+use strict;
 
-extends qw(AFS::Object);
-
-has q{_owned}      => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
-has q{_membership} => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
+our $VERSION = '1.99';
 
 sub _addOwned {
-    return shift->_owned->{ shift(@_) }++;
+    my $self = shift;
+    my $owned = shift;
+    return $self->{_owned}->{$owned}++;
 }
 
 sub getOwned {
-    return keys %{ shift->_owned };
+    my $self = shift;
+    return unless ref $self->{_owned};
+    return keys %{$self->{_owned}};
 }
 
 sub _addMembership {
-    return shift->_membership->{ shift(@_) }++;
+    my $self = shift;
+    my $membership = shift;
+    return $self->{_membership}->{$membership}++;
 }
 
 sub getMembership {
-    return keys %{ shift->_membership };
+    my $self = shift;
+    return unless ref $self->{_membership};
+    return keys %{$self->{_membership}};
 }
 
 1;

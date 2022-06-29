@@ -1,281 +1,361 @@
+
 package AFS::Command::Base;
 
-require 5.010;
+require 5.6.0;
 
-use Moose;
+use strict;
 use English;
 use Carp;
-
-use Data::Dumper;
-
 use File::Basename qw(basename);
-use File::Temp;
-use File::Slurp;
 use Date::Format;
+
 use IO::File;
 use IO::Pipe;
 
-our $AUTOLOAD = q{};
+our $AUTOLOAD	= "";
+our $VERSION = '1.99';
 
-has q{localtime}  => ( is => q{rw}, isa => q{Int}, default => 0 );
-has q{noauth}     => ( is => q{rw}, isa => q{Int}, default => 0 );
-has q{localauth}  => ( is => q{rw}, isa => q{Int}, default => 0 );
-has q{encrypt}    => ( is => q{rw}, isa => q{Int}, default => 0 );
-has q{quiet}      => ( is => q{rw}, isa => q{Int}, default => 0 );
+my $operation_unsupported = {
+    'AFS::Command::PTS' => {
+        'interactive' => 1,
+        'quit' => 1,
+        'sleep' => 1,
+        'source' => 1,
+    },
+};
 
-has q{command}    => ( is => q{rw}, isa => q{Str}, lazy_build => 1 );
-has q{operation}  => ( is => q{rw}, isa => q{Str}, default => q{} );
+my $operation_aliases = {
+    'AFS::Command::VOS' => {
+        'listfs' => 'listaddrs',
+        'listloc' => 'listvldb',
+        'syncfs' => 'syncserv',
+        'syncloc' => 'syncvldb',
+        'unlockall' => 'unlockvldb',
+    },
+};
 
-has q{_errors}     => ( is => q{rw}, isa => q{Str}, default => q{} );
+our %Carp =
+  (
+   carp		=> \&Carp::carp,
+   croak	=> \&Carp::croak,
+  );
 
-has q{_commands}  => ( is => q{rw}, isa => q{ArrayRef}, default => sub { return []; } );
-has q{_pids}      => ( is => q{rw}, isa => q{HashRef},  default => sub { return {}; } );
+sub setCarp {
 
-has q{_operations} => ( is => q{rw}, isa => q{HashRef}, lazy_build => 1 );
-has q{_arguments}  => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
+    my $class = shift;
+    my (%args) = @_;
 
-has q{_handle}  => ( is => q{rw}, isa => q{IO::Pipe::End} );
-has q{_stderr}  => ( is => q{rw}, isa => q{IO::File} );
-has q{_tmpfile} => ( is => q{rw}, isa => q{Str} );
-
-sub debug {
-    my $self = shift;
-    return if not $ENV{AFS_COMMAND_DEBUG};
-    carp @_;
-}
-
-sub _build_command {
-    my $self  = shift;
-    my $class = ref $self;
-    my ($command) = reverse split m{::}ms, $class;
-    return lc($command);
-}
-
-sub _build__operations {
-
-    my $self = shift;
-    my $operation = shift;
-
-    my $operations = {};
-
-    # This hack is necessary to support the offline/online "hidden"
-    # vos commands.  These won't show up in the normal help output, so
-    # we have to check for them individually.  Since offline and
-    # online are implemented as a pair, we can just check one of them,
-    # and assume the other is there, too.
-
-    foreach my $type ( qw(default hidden) ) {
-
-        if ( $type eq q{hidden} ) {
-            next if not $self->isa( q{AFS::Command::VOS} );
-        }
-
-        my $pipe = IO::Pipe->new || croak qq{Unable to create pipe: $ERRNO\n};
-
-        my $pid = fork;
-
-        defined $pid || croak qq{Unable to fork: $ERRNO\n};
-
-        if ( $pid == 0 ) {
-
-            STDERR->fdopen( STDOUT->fileno, q{w} ) ||
-                croak qq{Unable to redirect stderr: $ERRNO\n};
-            STDOUT->fdopen( $pipe->writer->fileno, q{w} ) ||
-                croak qq{Unable to redirect stdout: $ERRNO\n};
-
-            my $command = $self->command;
-
-            if ( $type eq q{default} ) {
-                $command .= q{ help};
-            } else {
-                $command .= q{ offline -help};
-            }
-
-            exec $command ||
-                croak qq{Unable to exec $command: $ERRNO\n};
-
-        } else {
-
-            $pipe->reader;
-
-            while ( defined($_ = $pipe->getline) ) {
-                if ( $type eq q{default} ) {
-                    next if m{Commands \s+ are:}msx;
-                    my ($command) = split;
-                    next if $command =~ m{^(apropos|help)$}msx;
-                    $operations->{$command}++;
-                } elsif ( m{^Usage:}msx ) {
-                    $operations->{offline}++;
-                    $operations->{online}++;
-                }
-            }
-
-        }
-
-        if ( not waitpid($pid,0) ) {
-            croak qq{Unable to get status of child process ($pid)\n};
-        }
-
-        if ( $CHILD_ERROR ) {
-            my $class = ref $self;
-            croak qq{Error running command help. Unable to configure $class\n};
-        }
-
+    foreach my $key ( keys %args ) {
+	unless ( $Carp{$key} ) {
+	    croak("Unsupported argument: '$key'");
+	}
+	unless ( ref $args{$key} eq 'CODE' ) {
+	    croak("Not a code reference: '$args{$key}'");
+	}
+	$Carp{$key} = $args{$key};
     }
 
-    return $operations;
+    return AFS::Object->_setCarp(@_);
 
+}
+
+sub new {
+
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+    my %args = @_;
+
+    my $self = {};
+
+    foreach my $key ( qw( localtime noauth localauth encrypt quiet timestamps ) ) {
+	$self->{$key}++ if $args{$key};
+    }
+
+    # AFS::Command::VOS -> vos
+    if ( $args{command} ) {
+        my @commands = (split /\s+/,$args{command});
+        push (@{$self->{command}},@commands);
+    } else {
+        @{$self->{command}} = lc((split(/::/,$class))[2]);
+    }
+
+    bless $self, $class;
+
+    return $self;
+
+}
+
+sub errors {
+    my $self = shift;
+    return $self->{errors};
 }
 
 sub supportsOperation {
-    return shift->_operations->{ shift(@_) };
+    my $self = shift;
+    my $operation = shift;
+    return $self->_operations($operation);
 }
 
 sub supportsArgument {
     my $self = shift;
     my $operation = shift;
     my $argument = shift;
-    return if not $self->supportsOperation( $operation );
-    return exists $self->_operation_arguments( $operation )->{ $argument };
+    return unless $self->_operations($operation);
+    return unless $self->_arguments($operation);
+    return exists $self->{_arguments}->{$operation}->{$argument};
 }
 
-sub supportsArgumentRequired {
+sub _Carp {
+    my $self = shift;
+    $Carp{carp}->(@_);
+}
+
+sub _Croak {
+    my $self = shift;
+    $Carp{croak}->(@_);
+}
+
+sub _operations {
+
     my $self = shift;
     my $operation = shift;
-    my $argument = shift;
-    return if not $self->supportsArgument( $operation, $argument );
-    my $arguments = $self->_operation_arguments( $operation )->{ $argument };
-    return if exists $arguments->{required};
+
+    my $class = ref $self;
+
+    unless ( $self->{_operations} ) {
+
+	my %operations = ();
+
+	#
+	# This hack is necessary to support the offline/online "hidden"
+	# vos commands.  These won't show up in the normal help output,
+	# so we have to check for them individually.  Since offline and
+	# online are implemented as a pair, we can just check one of
+	# them, and assume the other is there, too.
+	#
+
+	foreach my $type ( qw(default hidden) ) {
+
+	    if ( $type eq 'hidden' ) {
+		next unless $self->isa("AFS::Command::VOS");
+	    }
+
+	    my $pipe = IO::Pipe->new() || do {
+		$self->_Carp("Unable to create pipe: $ERRNO\n");
+		return;
+	    };
+
+	    my $pid = fork();
+
+	    unless ( defined $pid ) {
+		$self->_Carp("Unable to fork: $ERRNO\n");
+		return;
+	    }
+
+	    if ( $pid == 0 ) {
+
+		STDERR->fdopen( STDOUT->fileno(), "w" ) ||
+		  $self->_Croak("Unable to redirect stderr: $ERRNO\n");
+		STDOUT->fdopen( $pipe->writer()->fileno(), "w" ) ||
+		  $self->_Croak("Unable to redirect stdout: $ERRNO\n");
+
+		if ( $type eq 'default' ) {
+		    exec @{$self->{command}}, 'help';
+		} else {
+		    exec @{$self->{command}}, 'offline', '-help';
+		}
+		die "Unable to exec @{$self->{command}} help: $ERRNO\n";
+
+	    } else {
+
+		$pipe->reader();
+
+		while ( defined($_ = $pipe->getline()) ) {
+		    if ( $type eq 'default' ) {
+			next if /Commands are:/;
+			my ($command) = split;
+			next if $command =~ /^(apropos|help)$/;
+			$operations{$command}++;
+		    } else {
+			if ( /^Usage:/ ) {
+			    $operations{offline}++;
+			    $operations{online}++;
+                # XXX: listaddrs is available on every release, but hidden in AuriStor :(
+			    $operations{listaddrs}++;
+			}
+		    }
+		}
+
+	    }
+
+	    unless ( waitpid($pid,0) ) {
+		$self->_Carp("Unable to get status of child process ($pid)");
+		return;
+	    }
+
+	    if ( $? ) {
+		$self->_Carp("Error running @{$self->{command}} help.  Unable to configure $class");
+		return;
+	    }
+
+	}
+
+	$self->{_operations} = \%operations;
+
+    # Eliminate unsupported operations
+    foreach my $c ( keys %$operation_unsupported ) {
+        next unless ( $self->isa($c) );
+        foreach my $a ( keys %{$operation_unsupported->{$c}} ) {
+            delete $self->{_operations}->{$a} if ( exists $self->{_operations}->{$a} );
+        }
+    }
+
+
+    }
+
+    return $self->{_operations}->{$operation};
+
 }
 
-sub supportsArgumentOptional {
-    my $self = shift;
-    my $operation = shift;
-    my $argument = shift;
-    return if not $self->supportsArgument( $operation, $argument );
-    my $arguments = $self->_operation_arguments( $operation )->{ $argument };
-    return if exists $arguments->{optional};
-}
+sub _arguments {
 
-sub _operation_arguments {
+    my $self		= shift;
+    my $operation 	= shift;
 
-    my $self      = shift;
-    my $operation = shift;
+    my $arguments =
+      {
+       optional		=> {},
+       required		=> {},
+       aliases		=> {},
+      };
 
-    my $arguments = {
-        optional => {},
-        required => {},
-        aliases  => {},
+    my @command;
+    push (@command, @{$self->{command}});
+
+    unless ( $self->_operations($operation) ) {
+	$self->_Carp("Unsupported @command operation '$operation'\n");
+	return;
+    }
+
+    return $self->{_arguments}->{$operation}
+      if ref $self->{_arguments}->{$operation} eq 'HASH';
+
+    my $pipe = IO::Pipe->new() || do {
+	$self->_Carp("Unable to create pipe: $ERRNO");
+	return;
     };
 
-    my $command = $self->command;
+    my $pid = fork();
 
-    return if not $self->supportsOperation($operation);
+    my $errors = 0;
 
-    return $self->_arguments->{$operation} if $self->_arguments->{$operation};
-
-    my $pipe = IO::Pipe->new || croak qq{Unable to create pipe: $ERRNO};
-
-    my $pid = fork;
-
-    defined $pid || croak qq{Unable to fork: $ERRNO};
+    unless ( defined $pid ) {
+	$self->_Carp("Unable to fork: $ERRNO");
+	return;
+    }
 
     if ( $pid == 0 ) {
 
-        STDERR->fdopen( STDOUT->fileno, q{w} ) ||
-            croak qq{Unable to redirect stderr: $ERRNO};
-        STDOUT->fdopen( $pipe->writer->fileno, q{w} ) ||
-            croak qq{Unable to redirect stdout: $ERRNO\n};
-        exec( $command, $operation, '-help' ) ||
-            croak qq{Unable to exec $command help $operation: $ERRNO};
+	STDERR->fdopen( STDOUT->fileno(), "w" ) ||
+	  die "Unable to redirect stderr: $ERRNO\n";
+	STDOUT->fdopen( $pipe->writer()->fileno(), "w" ) ||
+	  die "Unable to redirect stdout: $ERRNO\n";
+	exec @command, $operation, '-help';
+	die "Unable to exec @command help $operation: $ERRNO\n";
 
     } else {
 
-        $pipe->reader;
+	$pipe->reader();
 
-        while ( defined($_ = $pipe->getline) ) {
+    my $in_usage = 0;
+	while ( <$pipe> ) {
 
-            if ( m{Unrecognized \s+ operation \s+ '$operation'}msx ) {
-                croak qq{Unsupported $command operation '$operation'};
-            }
+	    if ( /Unrecognized operation '$operation'/ ) {
+		$self->_Carp("Unsupported @command operation '$operation'\n");
+		$errors++;
+		last;
+	    }
 
-            next if not s{^Usage:.*\s+$operation\s+}{}ms;
+        # AuriStor: extended usage
+        last if ( /^Where:/ or /^$/ );
+        # Usage: fs setacl
+	    next unless ( s/^Usage:.*\s+$operation\s+// or $in_usage );
+        $in_usage = 1;
 
-            while ( $_ ) {
-                if ( s{^\[\s*-(\w+?)\s*\]\s*}{}ms  ) {
-                    $arguments->{optional}->{$1} = 0
-                        if $1 ne q{help}; # Yeah, skip it...
-                } elsif ( s{^\[\s*-(\w+?)\s+<[^>]*?>\+\s*]\s*}{}ms ) {
-                    $arguments->{optional}->{$1} = [];
-                } elsif ( s{^\[\s*-(\w+?)\s+<[^>]*?>\s*]\s*}{}ms ) {
-                    $arguments->{optional}->{$1} = 1;
-                } elsif ( s{^\s*-(\w+?)\s+<[^>]*?>\+\s*}{}ms ) {
-                    $arguments->{required}->{$1} = [];
-                } elsif ( s{^\s*-(\w+?)\s+<[^>]*?>\s*}{}ms ) {
-                    $arguments->{required}->{$1} = 1;
-                } elsif ( s{^\s*-(\w+?)(:?\s+|$)}{}ms ) {
-                    $arguments->{required}->{$1} = 0;
-                } else {
-                    croak(
-                        qq{Unable to parse $command help for $operation\n},
-                        qq{Unrecognized string: '$_'},
-                    );
-                }
-            }
+	    while ( $_ ) {
+        chomp;
+        my @a;
+        # [-clear]
+		if ( s/^\s*\[(\s*-\w+\s*(\|\s*-\w+)*)\s*\]\s*//  ) {
+		    (my $a = $1) =~ s/\s*-//g;
+		    next if grep /^help$/, split /\s*\|\s*/, $a; # Yeah, skip it...
+		    $arguments->{optional}->{$_} = 0 foreach split /\s*\|\s*/, $a;
+        # [-path <dir/file path>+]
+		} elsif ( s/^\s*\[(\s*-\w+\s*(\|\s*-\w+)*)\s+<[^>]*?>\+\s*\]\s*// ) {
+		    (my $a = $1) =~ s/\s*-//g;
+		    $arguments->{optional}->{$_} = [] foreach split /\s*\|\s*/, $a;
+        # [-file <output to named file>]
+		} elsif ( s/^\s*\[(\s*-\w+\s*(\|\s*-\w+)*)\s+<[^>]*?>\s*\]\s*// ) {
+            (my $a = $1) =~ s/\s*-//g;
+		    $arguments->{optional}->{$_} = 1 foreach split /\s*\|\s*/, $a;
+        # AuriStor: [-encrypt [<encrypt commands>]]
+        # XXX: code cannot deal with this case correctly yet!
+		} elsif ( s/^\s*\[(\s*-\w+\s*(\|\s*-\w+)*)\s+\[\s*<[^>]*?>\s*\]\s*\]\s*// ) {
+            (my $a = $1) =~ s/\s*-//g;
+		    $arguments->{optional}->{$_} = 1 foreach split /\s*\|\s*/, $a;
+        # -dir <directory>+
+		} elsif ( s/^\s*(\s*-\w+\s*(\|\s*-\w+)*)\s+<[^>]*?>\+\s*// ) {
+            (my $a = $1) =~ s/\s*-//g;
+		    $arguments->{required}->{$_} = [] foreach split /\s*\|\s*/, $a;
+        # -server <file server to deregister from the location service>
+		} elsif ( s/^\s*(\s*-\w+\s*(\|\s*-\w+)*)\s+<[^>]*?>\s*// ) {
+            (my $a = $1) =~ s/\s*-//g;
+		    $arguments->{required}->{$_} = 1 foreach split /\s*\|\s*/, $a;
+        # -localauth
+		} elsif ( s/^\s*(\s*-\w+\s*(\|\s*-\w+)*)\s*// ) {
+            (my $a = $1) =~ s/\s*-//g;
+		    $arguments->{required}->{$_} = 0 foreach split /\s*\|\s*/, $a;
+		} else {
+		    $self->_Carp("Unable to parse @command help for $operation\n" .
+				 "Unrecognized string: '$_'");
+		    $errors++;
+		    last;
+		}
+	    }
+	}
 
-            last;
-
-        }
-
-    }
-
-    #
-    # We need to force certain API calls to use a single argument,
-    # instead of a list, for robustness of error handling.
-    #
-    if ( $operation eq q{listowned} ) {
-        $arguments->{required}->{nameorid} = 1;
-    }
-
-    if ( $operation ~~ [qw( createuser creategroup )] ) {
-        $arguments->{required}->{name} = 1;
-        $arguments->{optional}->{id}   = 1;
-    }
-
-    # Niether of these options is supported by the parsing logic for
-    # pts membership yet, so both options will appear to be
-    # unsupported until that code is written.
-    if ( $operation eq q{membership} ) {
-        delete $arguments->{optional}->{supergroups};
-        delete $arguments->{optional}->{expandgroups};
     }
 
     #
     # XXX -- Hack Alert!!!
     #
-    # Because the force option to vos release changed from -f to
-    # -force, you can't use the API transparently with 2 different vos
-    # binaries that support the 2 different options.  If we need more
-    # of these, we can add them, as this let's us alias one argument
-    # to another.
+    # Because someone decided to change the force option to vos
+    # release from -f to -force, you can't use the API tranparently
+    # with 2 different vos binaries that support the 2 different options.
     #
-    if ( $self->isa( q{AFS::Command::VOS} ) and $operation eq q{release} ) {
-        if ( exists $arguments->{optional}->{f} ) {
-            $arguments->{aliases}->{force} = q{f};
-        } elsif ( exists $arguments->{optional}->{force} ) {
-            $arguments->{aliases}->{f} = q{force};
-        }
+    # If we need more of these, we can add them, as this let's us
+    # alias one argument to another.
+    #
+    if ( $self->isa("AFS::Command::VOS") && $operation eq 'release' ) {
+	if ( exists $arguments->{optional}->{f} ) {
+	    $arguments->{aliases}->{force} = 'f';
+	} elsif ( exists $arguments->{optional}->{force} ) {
+	    $arguments->{aliases}->{f} = 'force';
+	}
     }
 
-    if ( not waitpid($pid,0) ) {
-        croak qq{Unable to get status of child process ($pid)};
+    unless ( waitpid($pid,0) ) {
+	$self->_Carp("Unable to get status of child process ($pid)");
+	$errors++;
     }
 
-    if ( $CHILD_ERROR ) {
-        croak qq{Error running $command $operation -help.  Unable to configure $command $operation};
+    if ( $? ) {
+	$self->_Carp("Error running @command $operation -help.  Unable to configure @command $operation");
+	$errors++;
     }
 
-    return $self->_arguments->{$operation} = $arguments;
+    return if $errors;
+    return $self->{_arguments}->{$operation} = $arguments;
 
 }
 
@@ -283,20 +363,29 @@ sub _save_stderr {
 
     my $self = shift;
 
-    my $olderr = IO::File->new( qq{>&STDERR} ) or
-        croak qq{Unable to dup stderr: $ERRNO};
+    $self->{olderr} = IO::File->new(">&STDERR") || do {
+	$self->_Carp("Unable to dup stderr: $ERRNO");
+	return;
+    };
 
-    $self->_stderr( $olderr );
+    my $command = basename((split /\s+/,@{$self->{command}})[0]);
 
-    my $tmpfile = File::Temp->new(
-        TEMPLATE => q{/tmp/afscmd.stderr.XXXXXXXX},
-        UNLINK   => 0,
-    ) or croak qq{Unable to create File::Temp object\n};
+    $self->{tmpfile} = "/tmp/.$command.$self->{operation}.$$";
 
-    STDERR->fdopen( $tmpfile->fileno, q{w} ) or
-        croak qq{Unable to reopen stderr: $ERRNO};
+    my $newerr = IO::File->new(">$self->{tmpfile}") || do {
+	$self->_Carp("Unable to open $self->{tmpfile}: $ERRNO");
+	return;
+    };
 
-    $self->_tmpfile( $tmpfile->filename );
+    STDERR->fdopen( $newerr->fileno(), "w" ) || do {
+	$self->_Carp("Unable to reopen stderr: $ERRNO");
+	return;
+    };
+
+    $newerr->close() || do {
+	$self->_Carp("Unable to close $self->{tmpfile}: $ERRNO");
+	return;
+    };
 
     return 1;
 
@@ -306,18 +395,40 @@ sub _restore_stderr {
 
     my $self = shift;
 
-    STDERR->fdopen( $self->_stderr->fileno, q{w} ) or
-        croak qq{Unable to restore stderr: $ERRNO};
+    STDERR->fdopen( $self->{olderr}->fileno(), "w") || do {
+	$self->_Carp("Unable to restore stderr: $ERRNO");
+	return;
+    };
 
-    $self->_stderr->close or
-        croak qq{Unable to close saved stderr: $ERRNO};
+    $self->{olderr}->close() || do {
+	$self->_Carp("Unable to close saved stderr: $ERRNO");
+	return;
+    };
 
-    my $tmpfile = $self->_tmpfile;
+    delete $self->{olderr};
 
-    $self->_errors( read_file( $tmpfile ) );
+    my $newerr = IO::File->new($self->{tmpfile}) || do {
+	$self->_Carp("Unable to reopen $self->{tmpfile}: $ERRNO");
+	return;
+    };
 
-    unlink $tmpfile or
-        croak qq{Unable to unlink $tmpfile: $ERRNO};
+    $self->{errors} = "";
+
+    while ( <$newerr> ) {
+	$self->{errors} .= $_;
+    }
+
+    $newerr->close() || do {
+	$self->_Carp("Unable to close $self->{tmpfile}: $ERRNO");
+	return;
+    };
+
+    unlink($self->{tmpfile}) || do {
+	$self->_Carp("Unable to unlink $self->{tmpfile}: $ERRNO");
+	return;
+    };
+
+    delete $self->{tmpfile};
 
     return 1;
 
@@ -326,137 +437,177 @@ sub _restore_stderr {
 sub _parse_arguments {
 
     my $self = shift;
-    my %args = @_;
+    my $class = ref($self);
+    my (%args) = @_;
 
-    my $class = ref $self;
+    #
+    # XXX -- Hack Alert!!!
+    #
+    # AuriStor has changed the sub-command name for certain VOS operations,
+    # notably 'vldb' is replaced by 'loc'.
+    # Note: aliased here as this is where commands are generated!
 
-    my $operation = $self->operation;
-    my $arguments = $self->_operation_arguments( $operation ) ||
-        croak qq{Unable to obtain arguments for $class->$operation};
+    foreach my $c ( keys %$operation_aliases ) {
+        next unless ( $self->isa($c) );
+        foreach my $a ( keys %{$operation_aliases->{$c}} ) {
+            next unless ( $self->{operation} eq $a or $self->{operation} eq $operation_aliases->{$c}->{$a} );
+            # determine which of the actual commands 'vos' supports
+            # Note: we fail below if 'vos' doesn't support either sub-command
+            $self->{operation} = ( $self->_operations( $a ) ) ? $a : $operation_aliases->{$c}->{$a};
+        }
+    }
+
+    my $arguments = $self->_arguments($self->{operation});
+
+    unless ( defined $arguments ) {
+	$self->_Carp("Unable to obtain arguments for $class->$self->{operation}");
+	return;
+    }
+
+    $self->{errors} = "";
+
+    $self->{cmds} = [];
 
     if ( $args{inputfile} ) {
-        $self->_commands( [ [ q{cat}, $args{inputfile} ] ] );
-        return 1;
+
+	push( @{$self->{cmds}}, [ 'cat', $args{inputfile} ] );
+
+    } else {
+
+	my @argv = ( @{$self->{command}}, $self->{operation} );
+
+	foreach my $key ( keys %args ) {
+	    next unless $arguments->{aliases}->{$key};
+	    $args{$arguments->{aliases}->{$key}} = delete $args{$key};
+	}
+
+	foreach my $key ( qw( noauth localauth encrypt ) ) {
+	    next unless $self->{$key};
+	    $args{$key}++ if exists $arguments->{required}->{$key};
+	    $args{$key}++ if exists $arguments->{optional}->{$key};
+	}
+
+	unless ( $self->{quiet} ) {
+	    $args{verbose}++ if exists $arguments->{optional}->{verbose};
+	}
+
+	foreach my $type ( qw( required optional ) ) {
+
+	    foreach my $key ( keys %{$arguments->{$type}} ) {
+
+		my $hasvalue = $arguments->{$type}->{$key};
+
+		if ( $type eq 'required' ) {
+		    unless ( exists $args{$key} ) {
+			$self->_Carp("Required argument '$key' not provided");
+			return;
+		    }
+		} else {
+		    next unless exists $args{$key};
+		}
+
+		if ( $hasvalue ) {
+		    if ( ref $args{$key} eq 'HASH' || ref $args{$key} eq 'ARRAY' ) {
+			unless ( ref $hasvalue eq 'ARRAY' ) {
+			    $self->_Carp("Invalid argument '$key': can't provide a list of values");
+			    return;
+			}
+			push(@argv,"-$key");
+			foreach my $value ( ref $args{$key} eq 'HASH' ? %{$args{$key}} : @{$args{$key}} ) {
+			    push(@argv,$value);
+			}
+		    } else {
+			push(@argv,"-$key",$args{$key});
+		    }
+		} else {
+		    push(@argv,"-$key") if $args{$key};
+		}
+
+		delete $args{$key};
+
+	    }
+
+	}
+
+	if ( %args ) {
+	    $self->_Carp("Unsupported arguments: " . join(' ',sort keys %args));
+	    return;
+	}
+
+	push( @{$self->{cmds}}, \@argv );
+
     }
-
-    my $command = [ $self->command, $self->operation ];
-
-    foreach my $key ( keys %args ) {
-        next if not $arguments->{aliases}->{$key};
-        $args{$arguments->{aliases}->{$key}} = delete $args{$key};
-    }
-
-    foreach my $key ( qw( noauth localauth encrypt ) ) {
-        next if not $self->$key;
-        $args{$key}++ if exists $arguments->{required}->{$key};
-        $args{$key}++ if exists $arguments->{optional}->{$key};
-    }
-
-    if ( not $self->quiet ) {
-        $args{verbose}++ if exists $arguments->{optional}->{verbose};
-    }
-
-    foreach my $type ( qw( required optional ) ) {
-
-        foreach my $key ( keys %{ $arguments->{$type} } ) {
-
-            my $hasvalue = $arguments->{$type}->{$key};
-
-            if ( not exists $args{$key} ) {
-                next if $type ne q{required};
-                croak qq{Required argument '$key' not provided};
-            }
-
-            if ( $hasvalue ) {
-                if ( ref $args{$key} eq q{HASH} || ref $args{$key} eq q{ARRAY} ) {
-                    if ( ref $hasvalue ne q{ARRAY} ) {
-                        croak qq{Invalid argument '$key': can't provide a list of values};
-                    }
-                    push @{ $command }, qq{-$key};
-                    foreach my $value ( ref $args{$key} eq q{HASH} ? %{$args{$key}} : @{$args{$key}} ) {
-                        push @{ $command }, $value;
-                    }
-                } else {
-                    push @{ $command }, qq{-$key}, $args{$key};
-                }
-            } else {
-                push @{ $command }, qq{-$key} if $args{$key};
-            }
-
-            delete $args{$key};
-
-        }
-
-    }
-
-    if ( %args ) {
-        croak( qq{Unsupported arguments: } . join( q{ }, sort keys %args ) );
-    }
-
-    $self->_commands( [ $command ] );
 
     return 1;
 
 }
 
-sub _exec_commands {
+sub _exec_cmds {
 
     my $self = shift;
+
     my %args = @_;
 
-    my @commands = @{ $self->_commands };
+    my @cmds = @{$self->{cmds}};
 
-    $self->_errors( q{} );
-    $self->_pids( {} );
+    $self->{pids} = {};
 
-    for ( my $index = 0 ; $index <= $#commands ; $index++ ) {
+    for ( my $index = 0 ; $index <= $#cmds ; $index++ ) {
 
-        my $command = $commands[$index];
+	my $cmd = $cmds[$index];
 
-        my $pipe = IO::Pipe->new || croak qq{Unable to create pipe: $ERRNO};
+	my $pipe = IO::Pipe->new() || do {
+	    $self->_Carp("Unable to create pipe: $ERRNO");
+	    return;
+	};
 
-        my $pid = fork;
+	my $pid = fork();
 
-        defined $pid || croak qq{Unable to fork: $ERRNO};
+	unless ( defined $pid ) {
+	    $self->_Carp("Unable to fork: $ERRNO");
+	    return;
+	}
 
-        if ( $pid == 0 ) {
+	if ( $pid == 0 ) {
 
-            if ( $index == $#commands and exists $args{stdout} and $args{stdout} ne q{stdout} ) {
-                my $stdout = IO::File->new( qq{>$args{stdout}} ) ||
-                    croak qq{Unable to open $args{stdout}: $ERRNO};
-                STDOUT->fdopen( $stdout->fileno, q{w} ) ||
-                    croak qq{Unable to redirect stdout: $ERRNO};
-            } else {
-                STDOUT->fdopen( $pipe->writer->fileno, q{w} ) ||
-                    croak qq{Unable to redirect stdout: $ERRNO};
-            }
+	    if ( $index == $#cmds &&
+		 exists $args{stdout} && $args{stdout} ne 'stdout' ) {
+		my $stdout = IO::File->new(">$args{stdout}") ||
+		  $self->_Croak("Unable to open $args{stdout}: $ERRNO");
+		STDOUT->fdopen( $stdout->fileno(), "w" ) ||
+		  $self->_Croak("Unable to redirect stdout: $ERRNO");
+	    } else {
+		STDOUT->fdopen( $pipe->writer()->fileno(), "w" ) ||
+		  $self->_Croak("Unable to redirect stdout: $ERRNO");
+	    }
 
-            if ( exists $args{stderr} and $args{stderr} eq q{stdout} ) {
-                STDERR->fdopen( STDOUT->fileno, q{w} ) ||
-                    croak qq{Unable to redirect stderr: $ERRNO};
-            }
+	    if ( exists $args{stderr} && $args{stderr} eq 'stdout' ) {
+		STDERR->fdopen( STDOUT->fileno(), "w" ) ||
+		  $self->_Croak("Unable to redirect stderr: $ERRNO");
+	    }
 
-            if ( $index == 0 ) {
-                if ( exists $args{stdin} and $args{stdin} ne q{stdin} ) {
-                    my $stdin = IO::File->new( qq{<$args{stdin}} ) ||
-                        croak qq{Unable to open $args{stdin}: $ERRNO};
-                    STDIN->fdopen( $stdin->fileno, q{r} ) ||
-                        croak qq{Unable to redirect stdin: $ERRNO};
-                }
-            } else {
-                STDIN->fdopen( $self->_handle->fileno, q{r} ) ||
-                    croak qq{Unable to redirect stdin: $ERRNO};
-            }
+	    if ( $index == 0 ) {
+		if ( exists $args{stdin} && $args{stdin} ne 'stdin' ) {
+		    my $stdin = IO::File->new("<$args{stdin}") ||
+		      $self->_Croak("Unable to open $args{stdin}: $ERRNO");
+		    STDIN->fdopen( $stdin->fileno(), "r" ) ||
+		      $self->_Croak("Unable to redirect stdin: $ERRNO");
+		}
+	    } else {
+		STDIN->fdopen( $self->{handle}->fileno(), "r" ) ||
+		  $self->_Croak("Unable to redirect stdin: $ERRNO");
+	    }
 
-            $ENV{TZ} = q{GMT} if not $self->localtime;
+	    $ENV{TZ} = 'GMT' unless $self->{localtime};
 
-            exec { $command->[0] } @{ $command } or
-                croak qq{Unable to exec $command->[0]: $ERRNO};
+	    exec( { $cmd->[0] } @{$cmd} ) ||
+	      $self->_Croak("Unable to exec @{$cmd}: $ERRNO");
 
-        }
+	}
 
-        $self->_handle( $pipe->reader );
-        $self->_pids->{$pid} = $command;
+	$self->{handle} = $pipe->reader();
+
+	$self->{pids}->{$pid} = $cmd;
 
     }
 
@@ -468,54 +619,70 @@ sub _parse_output {
 
     my $self = shift;
 
-    my $errors = q{};
+    $self->{errors} = "";
 
-    while ( defined($_ = $self->_handle->getline) ) {
-        $errors .= $_;
+    while ( defined($_ = $self->{handle}->getline()) ) {
+	$self->{errors} .= time2str("[%Y-%m-%d %H:%M:%S] ",time,'GMT') if $self->{timestamps};
+	$self->{errors} .= $_;
     }
-
-    $self->_errors( $errors );
 
     return 1;
 
 }
 
-sub _reap_commands {
+sub _reap_cmds {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    $self->_handle->close || croak qq{Unable to close pipe handle: $ERRNO};
+    my $errors = 0;
+
+    $self->{handle}->close() || do {
+	$self->_Carp("Unable to close pipe handle: $ERRNO");
+	$errors++;
+    };
+
+    delete $self->{handle};
+    delete $self->{cmds};
+
+    $self->{status} = {};
 
     my %allowstatus = ();
-
     if ( $args{allowstatus} ) {
-        map { $allowstatus{$_}++ } (
-            ref $args{allowstatus} eq q{ARRAY} ? @{ $args{allowstatus} } : $args{allowstatus}
-        );
+	if ( ref $args{allowstatus} eq 'ARRAY' ) {
+	    foreach my $status ( @{$args{allowstatus}} ) {
+		$allowstatus{$status}++;
+	    }
+	} else {
+	    $allowstatus{$args{allowstatus}}++;
+	}
     }
 
-    my $errors = q{};
+    foreach my $pid ( keys %{$self->{pids}} ) {
 
-    foreach my $pid ( keys %{ $self->_pids } ) {
+	$self->{status}->{$pid}->{cmd} =
+	  join(' ', @{delete $self->{pids}->{$pid}} );
 
-        if ( not waitpid($pid,0) ) {
-            $errors .= qq{Unable to read child process ($pid)\n};
-        }
+	if ( waitpid($pid,0) ) {
 
-        if ( $CHILD_ERROR ) {
-            if ( not %allowstatus or not $allowstatus{ $CHILD_ERROR >> 8 } ) {
-                my $command = join q{ }, @{ $self->_pids->{$pid} };
-                $errors .= qq{Error running '$command'\n};
-            }
-        }
+	    $self->{status}->{$pid}->{status} = $?;
+	    if ( $? ) {
+		if ( %allowstatus ) {
+		    $errors++ unless $allowstatus{1} or $allowstatus{$? >> 8};
+		} else {
+		    $errors++;
+		}
+	    }
+
+
+	} else {
+	    $self->{status}->{$pid}->{status} = undef;
+	    $errors++;
+	}
 
     }
 
-    if ( $errors ) {
-        croak( $self->_errors, $errors );
-    }
-
+    return if $errors;
     return 1;
 
 }
@@ -523,19 +690,25 @@ sub _reap_commands {
 sub AUTOLOAD {
 
     my $self = shift;
+    my (%args) = @_;
 
-    my $operation = $AUTOLOAD;
-    $operation =~ s{.*::}{}ms;
+    $self->{operation} = $AUTOLOAD;
+    $self->{operation} =~ s/.*:://;
 
-    $self->operation( $operation );
+    return unless $self->_parse_arguments(%args);
 
-    $self->_parse_arguments(@_);
-    $self->_exec_commands( stderr => q{stdout} );
-    $self->_parse_output;
-    $self->_reap_commands;
+    return unless $self->_exec_cmds( stderr => 'stdout' );
 
+    my $errors = 0;
+
+    $errors++ unless $self->_parse_output();
+    $errors++ unless $self->_reap_cmds();
+
+    return if $errors;
     return 1;
 
 }
+
+sub DESTROY {}
 
 1;

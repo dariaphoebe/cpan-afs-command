@@ -1,7 +1,10 @@
+
 package AFS::Object::Group;
 
-use Moose;
+use strict;
 
-extends qw(AFS::Object::Principal);
+our @ISA = qw(AFS::Object::Principal
+	      AFS::Object);
+our $VERSION = '1.99';
 
 1;

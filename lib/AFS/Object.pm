@@ -1,46 +1,83 @@
+
 package AFS::Object;
 
-use Moose;
+use strict;
 use Carp;
 
-our $AUTOLOAD = q{};
+our $AUTOLOAD = "";
+our $VERSION = '1.99';
 
-has q{_attrs} => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
+our %Carp =
+  (
+   carp		=> \&Carp::carp,
+   croak	=> \&Carp::croak,
+  );
 
-sub BUILD {
-    shift->_attrs( shift );
-}
-
-sub listAttributes {
-    return keys %{ shift->_attrs };
-}
-
-sub getAttribute {
-    return shift->_attrs->{ shift(@_) };
-}
-
-sub getAttributes {
-    return %{ shift->_attrs };
-}
-
-sub hasAttribute {
-    return exists shift->_attrs->{ shift(@_) };
-}
-
-sub _setAttribute {
-    my $self = shift;
-    my %data = @_;
-    foreach my $attr ( keys %data ) {
-        $self->_attrs->{$attr} = $data{$attr};
+sub _setCarp {
+    my $class = shift;
+    my (%args) = @_;
+    foreach my $key ( keys %args ) {
+	$Carp{$key} = $args{$key};
     }
     return 1;
 }
 
+sub new {
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+    my $self = { _attrs	=> { @_ } };
+    return bless $self, $class;
+}
+
+sub listAttributes {
+    my $self = shift;
+    return keys %{$self->{_attrs}};
+}
+
+sub getAttribute {
+    my $self = shift;
+    my $attr = shift;
+    return $self->{_attrs}->{$attr};
+}
+
+sub getAttributes {
+    my $self = shift;
+    my $attr = shift;
+    return %{$self->{_attrs}};
+}
+
+sub hasAttribute {
+    my $self = shift;
+    my $attr = shift;
+    return exists $self->{_attrs}->{$attr};
+}
+
+sub _Carp {
+    my $self = shift;
+    $Carp{carp}->(@_);
+}
+
+sub _Croak {
+    my $self = shift;
+    $Carp{croak}->(@_);
+}
+
+sub _setAttribute {
+    my $self = shift;
+    my (%attrs) = @_;
+    foreach my $attr ( keys %attrs ) {
+	$self->{_attrs}->{$attr} = $attrs{$attr};
+    }
+    return 1;
+}
+
+sub DESTROY {}
+
 sub AUTOLOAD {
     my $self = shift;
     my $attr = $AUTOLOAD;
-    $attr =~ s{.*::}{}ms;
-    return $self->getAttribute( $attr );
+    $attr =~ s/.*:://;
+    return $self->{_attrs}->{$attr};
 }
 
 1;

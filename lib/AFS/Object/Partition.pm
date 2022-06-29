@@ -1,52 +1,66 @@
+
 package AFS::Object::Partition;
 
-use Moose;
-use Carp;
+use strict;
 
-extends qw(AFS::Object);
-
-has q{_headers_byid}   => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
-has q{_headers_byname} => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
+our @ISA = qw(AFS::Object);
+our $VERSION = '1.99';
 
 sub getVolumeIds {
-    return keys %{ shift->_headers_byid };
+    my $self = shift;
+    return unless ref $self->{_headers};
+    return keys %{$self->{_headers}->{_byId}};
 }
 
 sub getVolumeNames {
-    return keys %{ shift->_headers_byname };
+    my $self = shift;
+    return unless ref $self->{_headers};
+    return keys %{$self->{_headers}->{_byName}};
 }
 
 sub getVolumeHeaderById {
-    return shift->_headers_byid->{ shift(@_) };
+    my $self = shift;
+    my $id = shift;
+    return unless ref $self->{_headers} && ref $self->{_headers}->{_byId};
+    return $self->{_headers}->{_byId}->{$id};
 }
 
 sub getVolumeHeaderByName {
-    return shift->_headers_byname->{ shift(@_) };
+    my $self = shift;
+    my $name = shift;
+    return unless ref $self->{_headers} && ref $self->{_headers}->{_byName};
+    return $self->{_headers}->{_byName}->{$name};
 }
 
 sub getVolumeHeaders {
-    return values %{ shift->_headers_byid };
+    my $self = shift;
+    return unless ref $self->{_headers} && ref $self->{_headers}->{_byId};
+    return values %{$self->{_headers}->{_byId}};
 }
 
 sub getVolumeHeader {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    if ( exists $args{id} and exists $args{name} ) {
-	croak qq{Invalid arguments: both of 'id' or 'name' may not be specified};
+    if ( exists $args{id} && exists $args{name} ) {
+	$self->_Carp("Invalid arguments: both of 'id' or 'name' may not be specified");
+	return;
     }
 
-    if ( not exists $args{id} and not exists $args{name} )  {
-	croak qq{Invalid arguments: at least one of 'id' or 'name' must be specified};
+    unless ( exists $args{id} || exists $args{name} )  {
+	$self->_Carp("Invalid arguments: at least one of 'id' or 'name' must be specified");
+	return;
     }
 
     if ( exists $args{id} ) {
-	return $self->_headers_byid->{ $args{id} };
+	return unless ref $self->{_headers} && ref $self->{_headers}->{_byId};
+	return $self->{_headers}->{_byId}->{$args{id}};
     }
 
     if ( exists $args{name} ) {
-	return $self->_headers_byname->{ $args{name} };
+	return unless ref $self->{_headers} && ref $self->{_headers}->{_byName};
+	return $self->{_headers}->{_byName}->{$args{name}};
     }
 
 }
@@ -56,15 +70,20 @@ sub _addVolumeHeader {
     my $self = shift;
     my $header = shift;
 
-    if ( not ref $header or not $header->isa( q{AFS::Object::VolumeHeader} ) ) {
-	croak qq{Invalid argument: must be an AFS::Object::VolumeHeader object};
+    unless ( ref $header && $header->isa("AFS::Object::VolumeHeader") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::VolumeHeader object");
     }
 
-    if ( $header->hasAttribute( q{name} ) ) {
-	$self->_headers_byname->{ $header->name } = $header;
+    if ( $header->hasAttribute('name') ) {
+	$self->{_headers}->{_byName}->{$header->name()} = $header;
     }
 
-    $self->_headers_byid->{ $header->id } = $header;
+    if ( $header->hasAttribute('id') ) {
+	$self->{_headers}->{_byId}->{$header->id()} = $header;
+    } else {
+	$self->_Croak("Volume header has no id attribute!!\n" .
+		      Data::Dumper->Dump([$header],['header']));
+    }
 
     return 1;
 

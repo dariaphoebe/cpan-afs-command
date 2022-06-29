@@ -1,14 +1,10 @@
+
 package AFS::Command::VOS;
 
-use Moose;
-use MooseX::Singleton;
+use strict;
 use English;
-use Carp;
 
-use feature q{switch};
-
-extends qw(AFS::Command::Base);
-
+use AFS::Command::Base;
 use AFS::Object;
 use AFS::Object::VLDB;
 use AFS::Object::VLDBEntry;
@@ -20,73 +16,125 @@ use AFS::Object::FileServer;
 use AFS::Object::Partition;
 use AFS::Object::Transaction;
 
-sub getVLDBEntry {
-
-    my $self = shift;
-    my %args = @_;
-
-    if ( not $args{name} ) {
-        croak qq{Missing required argument: name\n};
-    }
-
-    if ( ref $args{name} ) {
-        croak qq{Invalid argument: name is a reference\n};
-    }
-
-    my $result = $self->listvldb( %args );
-
-    return if not $result;
-
-    return $result->getVLDBEntry( name => $args{name} );
-
-}
+our @ISA = qw(AFS::Command::Base);
+our $VERSION = '1.99';
 
 sub backupsys {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    $self->operation( q{backupsys} );
+    my $result = AFS::Object->new();
 
-    my $result = AFS::Object->new;
+    $self->{operation} = "backupsys";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    my @volumes = ();
+    return unless $self->_save_stderr();
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    my $errors = 0;
 
-        chomp;
+    $errors++ unless $self->_exec_cmds();
 
-        given ( $_ ) {
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-            when ( m{Would have backed up volumes}ms ) {
-                while ( defined($_ = $self->_handle->getline) ) {
-                    chomp;
-                    last if m{^done};
-                    s{^\s+}{}ms;
-                    push @volumes, $_;
-                }
-            }
+	chomp;
 
-            when ( m{Creating backup volume for (\S+)}ms ) {
-                push @volumes, $1;
-            }
+	next unless ( /Total\s+volumes\s+backed\s+up:\s+(\d+);\s+failed\s+to\s+back\s+up:\s+(\d+)/ );
 
-            when ( m{Total volumes backed up: (\d+); failed to backup: (\d+)}ms ) {
-                $result->_setAttribute( total => $1, failed => $2 );
-            }
-
-        }
+    $result->_setAttribute(
+        total => $1,
+        failed => $2,
+    );
 
     }
 
-    $result->_setAttribute( volumes => \@volumes );
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    return if $errors;
+    return $result;
+
+}
+
+sub eachfs {
+
+    my $self = shift;
+    my (%args) = @_;
+
+    my $result = AFS::Object->new();
+
+    $self->{operation} = "eachfs";
+
+    # verbose output for 'eachfs' isn't useful
+    my $quiet = ( exists $self->{quiet} and $self->{quiet} );
+    $self->{quiet} = 1 unless ( exists $args{verbose} or $quiet );
+
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    my @output;
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	chomp;
+    push @output, $_;
+
+    }
+
+    $result->_setAttribute( output => \@output );
+
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
+
+    # reset quiet
+    delete $self->{quiet} unless ( $quiet );
+
+    return $result;
+
+}
+
+sub eachvol {
+
+    my $self = shift;
+    my (%args) = @_;
+
+    my $result = AFS::Object->new();
+
+    $self->{operation} = "eachvol";
+
+    # verbose output for 'eachvol' isn't useful
+    # need to restart
+    my $quiet = ( exists $self->{quiet} and $self->{quiet} );
+    $self->{quiet} = 1 unless ( exists $args{verbose} or $quiet );
+
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds( );
+
+    my @output;
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	chomp;
+    push @output, $_;
+
+    }
+
+    $result->_setAttribute( output => \@output );
+
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
+
+    # reset quiet
+    delete $self->{quiet} unless ( $quiet );
 
     return $result;
 
@@ -95,447 +143,563 @@ sub backupsys {
 sub examine {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    if ( exists $args{format} ) {
-        croak qq{Unsupported 'vos examine' argument: -format\n};
-    }
+    my $result = AFS::Object::Volume->new();
+    my $entry = AFS::Object::VLDBEntry->new( locked => 0 );
 
-    my $result = AFS::Object::Volume->new;
-    my $entry  = AFS::Object::VLDBEntry->new( locked => 0 );
+    $self->{operation} = "examine";
 
-    $self->operation( q{examine} );
+    return unless $self->_parse_arguments(%args);
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_save_stderr();
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    my $errors = 0;
 
-        chomp;
+    $errors++ unless $self->_exec_cmds();
 
-        # These two lines are part of the verbose output
-        next if m{Fetching VLDB entry}ms;
-        next if m{Getting volume listing}ms;
+    my $auristor;
 
-        #
-        # This code parses the volume header information.  If we match
-        # this line, then we go after the information we expect to be
-        # right after it.  We also test for this first, because we
-        # might very well have several of these chunks of data for RO
-        # volumes.
-        #
-        my $header = q{};
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        if ( m{^\*{4}}ms ) {
+	chomp;
 
-            $header = AFS::Object::VolumeHeader->new;
+	#
+	# These two lines are part of the verbose output
+	#
+	next if /Fetching (VLDB entry|information) for/;
+	next if /Getting volume listing/;
 
-            if ( m{Volume (\d+) is busy}ms ) {
-                $header->_setAttribute(
-                    id       => $1,
-                    status   => q{busy},
-                    attached => 1,
-                );
-            } elsif ( m{Could not attach volume (\d+)}ms ) {
-                $header->_setAttribute(
-                    id       => $1,
-                    status   => q{offline},
-                    attached => 0,
-                );
-            }
+	#
+	# This code parses the volume header information.  If we match
+	# this line, then we go after the information we expect to be
+	# right after it.  We also test for this first, because we
+	# might very well have several of these chunks of data for RO
+	# volumes.
+	#
+	if ( /^\*{4}/ ) {
 
-            $result->_addVolumeHeader($header);
+	    my $header = AFS::Object::VolumeHeader->new();
 
-            next;
+	    if ( /Volume (\d+) is busy/ ) {
+		$header->_setAttribute
+		  (
+		   id			=> $1,
+		   status		=> 'busy',
+		   attached		=> 1,
+		  );
+	    } elsif ( /Could not attach volume (\d+)/ ) {
+		$header->_setAttribute
+		  (
+		   id			=> $1,
+		   status		=> 'offline',
+		   attached		=> 0,
+		  );
+	    }
 
-        } elsif ( m{^(\S+)\s+(\d+)\s+(RW|RO|BK)\s+(\d+)\s+K}ms ) {
+	    $result->_addVolumeHeader($header);
 
-            $header = AFS::Object::VolumeHeader->new;
+	    next;
 
-            if ( m{^(\S+)\s+(\d+)\s+(RW|RO|BK)\s+(\d+)\s+K\s+([\w-]+)}ms ) {
+    # AuriStor changed from
+    # root.cell                         536870915 RW         33 K used 28 files On-line
+    #
+    # to
+    #
+    # root.cell
+    #     RWrite: 1048578       ROnly: 1048579
+    #
+    #     afs.your-cell-name.com:7005 /vicepa    1048578 RW On-line
+    #
+    #     Used                31 K
+    #     FileCount           26
+    } elsif ( /^(\S+)$/ ) {
+        # AuriStor volume name and volume IDs
+        $auristor->{name} = $1;
+        next unless ( defined($_ = $self->{handle}->getline()) );
+        $self->_Carp("Unrecognized output format (expected AuriStor volume IDs):\n" . $_)
+            unless ( /RWrite:/ );
+        $auristor->{rwrite} = $1 if ( /RWrite:\s*(\d+)/ );
+        $auristor->{ronly}  = $1 if ( /ROnly:\s*(\d+)/ );
+        $auristor->{backup} = $1 if ( /Backup:\s*(\d+)/ );
+        $auristor->{rclone} = $1 if ( /RClone:\s+(\d+)/ );
 
-                $header->_setAttribute(
-                    name => $1,
-                    id   => $2,
-                    type => $3,
-                    size => $4,
-                );
-                $header->_setAttribute( rwrite  => $2 ) if $3 eq q{RW};
-                $header->_setAttribute( ronly   => $2 ) if $3 eq q{RO};
-                $header->_setAttribute( backup  => $2 ) if $3 eq q{BK};
+	} elsif ( /^(\S+)\s+(\d+)\s+(RW|RO|BK)\s+(\d+)\s+K/ or /^\s*(\S+):(\d+)\s+(\/vicep\w+)\s+(\d+)\s+(RW|RO|BK)\s+(\S+)/ ) {
 
-                my $status = $5;
-                $status = q{offline} if $status eq q{Off-line};
-                $status = q{online}  if $status eq q{On-line};
-                $header->_setAttribute(
-                    status   => $status,
-                    attached => 1,
-                );
+	    my $header = AFS::Object::VolumeHeader->new();
 
-            } elsif ( m{^(\S+)\s+(\d+)\s+(RW|RO|BK)\s+(\d+)\s+K\s+used\s+(\d+)\s+files\s+([\w-]+)}ms ) {
+	    if ( /^(\S+)\s+(\d+)\s+(RW|RO|BK)\s+(\d+)\s+K\s+([\w-]+)/ ) {
 
-                $header->_setAttribute(
-                    name  => $1,
-                    id    => $2,
-                    type  => $3,
-                    size  => $4,
-                    files => $5,
-                );
-                $header->_setAttribute( rwrite  => $2 ) if $3 eq q{RW};
-                $header->_setAttribute( ronly   => $2 ) if $3 eq q{RO};
-                $header->_setAttribute( backup  => $2 ) if $3 eq q{BK};
+		$header->_setAttribute (
+		   name			=> $1,
+		   id 			=> $2,
+		   type 		=> $3,
+		   size 		=> $4,
+		  );
+		$header->_setAttribute( rwrite	=> $2 ) if $3 eq 'RW';
+		$header->_setAttribute( ronly	=> $2 ) if $3 eq 'RO';
+		$header->_setAttribute( backup	=> $2 ) if $3 eq 'BK';
 
-                my $status = $6;
-                $status = q{offline} if $status eq q{Off-line};
-                $status = q{online}  if $status eq q{On-line};
-                $header->_setAttribute(
-                    status   => $status,
-                    attached => 1,
-                );
+		my $status = $5;
+		$status = 'offline' if $status eq 'Off-line';
+		$status = 'online' if $status eq 'On-line';
+		$header->_setAttribute
+		  (
+		   status 		=> $status,
+		   attached		=> 1,
+		  );
 
-            } else {
+	    } elsif ( /^(\S+)\s+(\d+)\s+(RW|RO|BK)\s+(\d+)\s+K\s+used\s+(\d+)\s+files\s+([\w-]+)/ ) {
 
-                croak qq{Unable to parse volume header: '$_'};
+		$header->_setAttribute
+		  (
+		   name			=> $1,
+		   id			=> $2,
+		   type 		=> $3,
+		   size 		=> $4,
+		   files 		=> $5,
+		  );
+		$header->_setAttribute( rwrite	=> $2 ) if $3 eq 'RW';
+		$header->_setAttribute( ronly	=> $2 ) if $3 eq 'RO';
+		$header->_setAttribute( backup	=> $2 ) if $3 eq 'BK';
 
-            }
+		my $status = $6;
+		$status = 'offline' if $status eq 'Off-line';
+		$status = 'online' if $status eq 'On-line';
+		$header->_setAttribute
+		  (
+		   status 		=> $status,
+		   attached		=> 1,
+		  );
 
+        # AuriStor header line
+        } elsif ( /^\s*(\S+):(\d+)\s+(\/vicep\w+)\s+(\d+)\s+(RW|RO|BK)\s+(\S+)/ ) {
+
+            $self->_Carp("Unrecognized output format (missing volume name):\n" . $_)
+                unless ( ref $auristor eq 'HASH' and exists $auristor->{name});
+
+            $header->_setAttribute (
+                server		=> $1,
+                port        => $2,
+                partition 	=> $3,
+                id          => $4,
+                type 		=> $5,
+                name        => $auristor->{name},
+            );
+            $header->_setAttribute( rwrite	=> $4 ) if $5 eq 'RW';
+            $header->_setAttribute( ronly	=> $4 ) if $5 eq 'RO';
+            $header->_setAttribute( backup	=> $4 ) if $5 eq 'BK';
+            $entry->_setAttribute( $_ => $auristor->{$_} ) foreach grep(!/name$/, keys %$auristor);
+
+            my $status = $6;
+            $status = 'offline' if $status eq 'Off-line';
+            $status = 'online' if $status eq 'On-line';
+            $header->_setAttribute
+            (
+                status 		=> $status,
+                attached		=> 1,
+            );
+
+	    } else {
+
+		$self->_Carp("Unable to parse volume header: '$_'");
+
+	    }
+
+	    #
+	    # We are interested in the next 6 lines as they are also
+	    # from the same volume headers as the one we just matched.
+	    # Suck data until we get to a blank line.
+	    #
+	    while ( defined($_ = $self->{handle}->getline()) ) {
+
+		chomp;
+
+		last if /^\s*$/; # Stop when we hit the blank line
+
+		if ( m:^\s+(\S+)\s+(/vicep\w+)\s*$: ) {
+		    $header->_setAttribute
+		      (
+		       server		=> $1,
+		       partition	=> $2,
+		      );
+		    next;
+		}
+
+		#
+		# Next we get ALL the volume IDs we can off this next
+		# line.
+		#
+		# Q: Do we want to check that the id already found
+		# matches one of these??  Not yet...
+		#
+		if ( /^\s+RWrite\s+(\d+)\s+ROnly\s+(\d+)\s+Backup\s+(\d+)/ ) {
+
+		    $header->_setAttribute
+		      (
+		       rwrite		=> $1,
+		       ronly		=> $2,
+		       backup		=> $3,
+		      );
+
+		    if ( /RClone\s+(\d+)/ ) {
+			$header->_setAttribute( rclone	=> $1 );
+		    }
+		    next;
+
+		}
+
+		if ( /^\s+MaxQuota\s+(\d+)/ ) {
+		    $header->_setAttribute( maxquota	=> $1 );
+		    next;
+		}
+
+        # AuriStor places size on a separate line
+		if ( /^\s+Used\s+(\d+)\s+K/ ) {
+		    $header->_setAttribute( size => $1 );
+		    next;
+		}
+
+        # AuriStor places file count on a separate line
+		if ( /^\s+FileCount\s+(\d+)/ ) {
+		    $header->_setAttribute( files => $1 );
+		    next;
+		}
+
+		if ( /^\s+Creation\s+(.*)\s*$/ ) {
+		    $header->_setAttribute( creation	=> $1 );
+		    next;
+		}
+
+		if ( /^\s+Copy\s+(.*)\s*$/ ) {
+		    $header->_setAttribute( copyTime	=> $1 );
+		    next;
+		}
+
+		if ( /^\s+Backup\s+(.*)\s*$/ ) {
+		    $header->_setAttribute( backupTime	=> $1 );
+		    next;
+		}
+
+		if ( /^\s+Last Access\s+(.*)\s*$/ ) {
+		    $header->_setAttribute( access	=> $1 );
+		    next;
+		}
+
+		if ( /^\s+Last Update\s+(.*)\s*$/ ) {
+		    $header->_setAttribute( update	=> $1 );
+		    next;
+		}
+
+		if ( /^\s+(\d+) accesses/ ) {
+		    $header->_setAttribute( accesses	=> $1 );
+		    next;
+		}
+
+		#
+		# If we get this far, then we have an unrecognized
+		# line of vos examine output.  Complain.
+		#
+		$self->_Carp("Unrecognized output format:\n" . $_);
+
+	    }
+
+	    #
+	    # Are we looking for extended data??
+	    #
+	    if ( $args{extended} ) {
+
+		my $raw = AFS::Object->new();
+		my $author = AFS::Object->new();
+
+		my $boundary = 0;
+
+		while ( defined($_ = $self->{handle}->getline()) ) {
+
+		    chomp;
+
+		    $boundary++ if /^\s+\|-+\|\s*$/;
+
+		    last if /^\s*$/ && $boundary == 4;
+
+            # AuriStor: legacy format of
+            #                       Raw Read/Write Stats
+            #           |-------------------------------------------|
+            #           |    Same Network     |    Diff Network     |
+            #           |----------|----------|----------|----------|
+            #           |  Total   |   Auth   |   Total  |   Auth   |
+            #           |----------|----------|----------|----------|
+            # Reads     |        0 |        0 |       12 |       12 |
+            # Writes    |        0 |        0 |        0 |        0 |
+            #           |-------------------------------------------|
             #
-            # We are interested in the next 6 lines as they are also
-            # from the same volume headers as the one we just matched.
-            # Suck data until we get to a blank line.
+            # has finally been replaced with
             #
-            while ( defined($_ = $self->_handle->getline) ) {
+            #             Raw Read/Write Stats
+            #           |----------|----------|
+            #           |  Total   |   Auth   |
+            #           |----------|----------|
+            # Reads     |        9 |        9 |
+            # Writes    |        0 |        0 |
+            #           |---------------------|
+            #
+            # i.e. there's no differentiation based on network
 
-                chomp;
+		    next unless /\s+(\d+)\s+\|\s+(\d+)\s+\|\s+(\d+)\s+\|\s+(\d+)\s+\|/ or /\s+(\d+)\s+\|\s+(\d+)\s+\|/;
 
-                given ( $_ ) {
+		    my @column = ( $1, $2, $3, $4 );
 
-                    when ( m{^\s*$}ms ) {
-                        # Stop when we hit the blank line
-                        last;
-                    }
+		    my $class			= "";
+		    my $int			= "";
 
-                    when ( m{^\s+(\S+)\s+(/vicep\w+)\s*$}ms ) {
-                        $header->_setAttribute(
-                            server    => $1,
-                            partition => $2,
-                        );
-                    }
+		    $class = 'reads' 		if /^Reads/;
+		    $class = 'writes' 		if /^Writes/;
 
-                    #
-                    # Next we get ALL the volume IDs we can off this next
-                    # line.
-                    #
-                    # Q: Do we want to check that the id already found
-                    # matches one of these??  Not yet...
-                    #
-                    when ( m{^\s+RWrite\s+(\d+)\s+ROnly\s+(\d+)\s+Backup\s+(\d+)}ms ) {
-                        $header->_setAttribute(
-                            rwrite => $1,
-                            ronly  => $2,
-                            backup => $3,
-                        );
-                        if ( m{RClone\s+(\d+)}ms ) {
-                            $header->_setAttribute( rclone => $1 );
-                        }
-                    }
-
-                    when ( m{^\s+MaxQuota\s+(\d+)}ms ) {
-                        $header->_setAttribute( maxquota => $1 );
-                    }
-
-                    when ( m{^\s+Creation\s+(.*)\s*$}ms ) {
-                        $header->_setAttribute( creation => $1 );
-                    }
-
-                    when ( m{^\s+Copy\s+(.*)\s*$}ms ) {
-                        $header->_setAttribute( copyTime => $1 );
-                    }
-
-                    when ( m{^\s+Backup\s+(.*)\s*$}ms ) {
-                        $header->_setAttribute( backupTime => $1 );
-                    }
-
-                    when ( m{^\s+Last Access\s+(.*)\s*$}ms ) {
-                        $header->_setAttribute( access => $1 );
-                    }
-
-                    when ( m{^\s+Last Update\s+(.*)\s*$}ms ) {
-                        $header->_setAttribute( update => $1 );
-                    }
-
-                    when ( m{^\s+(\d+) accesses}ms ) {
-                        $header->_setAttribute( accesses => $1 );
-                    }
-
-                    default {
-                        croak( qq{Unrecognized output format:\n} . $_ );
-                    }
-
+		    if ( $class ) {
+                if ( defined $column[2] ) {
+                    my $same = AFS::Object->new( total => $column[0], auth => $column[1] );
+                    my $diff = AFS::Object->new ( total => $column[2], auth => $column[3] );
+                    my $stats = AFS::Object->new ( same => $same, diff => $diff );
+                    $raw->_setAttribute( $class	=> $stats );
+                } else {
+                    my $stats = AFS::Object->new( total => $column[0], auth => $column[1] );
+                    $raw->_setAttribute( $class	=> $stats );
                 }
-
             }
 
-            #
-            # Are we looking for extended data??
-            #
-            if ( $args{extended} ) {
+		    $int = '0sec' 		if /^0-60 sec/;
+		    $int = '1min' 		if /^1-10 min/;
+		    $int = '10min' 		if /^10min-1hr/;
+		    $int = '1hr' 		if /^1hr-1day/;
+		    $int = '1day' 		if /^1day-1wk/;
+		    $int = '1wk' 		if /^> 1wk/;
 
-                my $raw    = AFS::Object->new;
-                my $author = AFS::Object->new;
-
-                my $boundary = 0;
-
-                while ( defined($_ = $self->_handle->getline) ) {
-
-                    chomp;
-
-                    $boundary++ if m{^\s+\|-+\|\s*$}ms;
-
-                    last if m{^\s*$}ms and $boundary == 4;
-
-                    next if not m{\s+(\d+)\s+\|\s+(\d+)\s+\|\s+(\d+)\s+\|\s+(\d+)\s+\|}ms;
-
-                    my @column = ( $1, $2, $3, $4 );
-
-                    my $class = q{};
-                    my $int   = q{};
-
-                    $class = q{reads}  if m{^Reads}ms;
-                    $class = q{writes} if m{^Writes}ms;
-
-                    if ( $class ) {
-
-                        my $same = AFS::Object->new(
-                            total => $column[0],
-                            auth  => $column[1],
-                        );
-
-                        my $diff = AFS::Object->new(
-                           total => $column[2],
-                           auth  => $column[3],
-                          );
-
-                        my $stats = AFS::Object->new(
-                            same => $same,
-                            diff => $diff,
-                        );
-
-                        $raw->_setAttribute( $class => $stats );
-
-                    }
-
-                    $int = q{0sec}  if m{^0-60 sec}ms;
-                    $int = q{1min}  if m{^1-10 min}ms;
-                    $int = q{10min} if m{^10min-1hr}ms;
-                    $int = q{1hr}   if m{^1hr-1day}ms;
-                    $int = q{1day}  if m{^1day-1wk}ms;
-                    $int = q{1wk}   if m{^> 1wk}ms;
-
-                    if ( $int ) {
-
-                        my $file = AFS::Object->new(
-                            same => $column[0],
-                            diff => $column[1],
-                        );
-
-                        my $dir = AFS::Object->new(
-                            same => $column[2],
-                            diff => $column[3],
-                        );
-
-                        my $stats = AFS::Object->new(
-                            file => $file,
-                            dir  => $dir,
-                        );
-
-                        $author->_setAttribute( $int => $stats );
-
-                    }
-
+		    if ( $int ) {
+                if ( defined $column[2] ) {
+                    my $file = AFS::Object->new( same => $column[0], diff => $column[1] );
+                    my $dir = AFS::Object->new ( same => $column[2], diff => $column[3] );
+                    my $stats = AFS::Object->new ( file => $file, dir => $dir );
+                    $author->_setAttribute( $int	=> $stats );
+                } else {
+                    my $stats = AFS::Object->new( file => $column[0], dir => $column[1] );
+                    $author->_setAttribute( $int	=> $stats );
                 }
-
-                $header->_setAttribute(
-                    raw    => $raw,
-                    author => $author,
-                );
-
             }
+		}
 
-            $result->_addVolumeHeader($header);
+		$header->_setAttribute( raw => $raw, author => $author );
 
-            next;
+	    }
 
-        }
+	    $result->_addVolumeHeader($header);
 
-        #
-        # The rest of the information we get will be from the
-        # VLDB. This will start with the volume ids, which we DO want
-        # to check against those found above, since they are from a
-        # different source, and a conflict is cause for concern.
-        #
-        if ( m{^\s+RWrite:\s+(\d+)}ms ) {
-            if ( m{RWrite:\s+(\d+)}ms ) { $entry->_setAttribute( rwrite => $1 ); }
-            if ( m{ROnly:\s+(\d+)}ms )  { $entry->_setAttribute( ronly  => $1 ); }
-            if ( m{Backup:\s+(\d+)}ms ) { $entry->_setAttribute( backup => $1 ); }
-            if ( m{RClone:\s+(\d+)}ms ) { $entry->_setAttribute( rclone => $1 ); }
-            next;
-        }
+	    next;
 
+	}
 
-        #
-        # Next we are looking for the number of sites, and then we'll
-        # suck that data in as well.
-        #
-        # NOTE: Because there is more interesting data after the
-        # locations, we fall through to the next test once we are done
-        # parsing them.
-        #
-        if ( m{^\s+number of sites ->\s+(\d+)}ms ) {
+	#
+	# The rest of the information we get will be from the
+	# VLDB. This will start with the volume ids, which we DO want
+	# to check against those found above, since they are from a
+	# different source, and a conflict is cause for concern.
+	#
+	if ( /^\s+RWrite:\s+(\d+)/ ) {
 
-            $entry->_setAttribute( sites => $1 );
+	    if ( /RWrite:\s+(\d+)/ ) { $entry->_setAttribute( rwrite	=> $1 ); }
+	    if ( /ROnly:\s+(\d+)/ )  { $entry->_setAttribute( ronly	=> $1 ); }
+	    if ( /Backup:\s+(\d+)/ ) { $entry->_setAttribute( backup	=> $1 ); }
+	    if ( /RClone:\s+(\d+)/ ) { $entry->_setAttribute( rclone	=> $1 ); }
 
-            while ( defined($_ = $self->_handle->getline) ) {
+	    next;
 
-                chomp;
+	}			# if ( /^\s+RWrite:....
 
-                last if not m{^\s+server\s+(\S+)\s+partition\s+(/vicep\w+)\s+([A-Z]{2})\s+Site\s*(--\s+)?(.*)?}ms;
+	#
+	# Next we are looking for the number of sites, and then we'll
+	# suck that data in as well.
+	#
+	# NOTE: Because there is more interesting data after the
+	# locations, we fall through to the next test once we are done
+	# parsing them.
+	#
+	if ( /^\s+number of sites ->\s+(\d+)/ ) {
 
-                my $site = AFS::Object::VLDBSite->new(
-                    server    => $1,
-                    partition => $2,
-                    type      => $3,
-                    status    => $5,
-                );
+        $entry->_setAttribute( sites => $1 );
 
-                $entry->_addVLDBSite($site);
+	    while ( defined($_ = $self->{handle}->getline()) ) {
 
-            }
+		chomp;
 
-        }
+        last unless m%^\s+server\s+([^:]+)(:(\d+))?\s+partition\s+(/vicep\w+)\s+([A-Z]{2})\s+Site\s*(--\s+)?(.*)?%;
 
-        #
-        # Last possibility (that we know of) -- volume might be
-        # locked.
-        #
-        if ( m{LOCKED}ms ) {
-            $entry->_setAttribute( locked => 1 );
-            next;
-        }
+        my $port = ( defined $3 ) ? $3 : 7005;
+		my $site = AFS::Object::VLDBSite->new
+		  (
+		   server		=> $1,
+           port         => $port,
+		   partition	=> $4,
+		   type			=> $5,
+		   status		=> $7,
+		  );
 
-        #
-        # Actually, this is the last possibility...  The volume name
-        # leading the VLDB entry stanza.
-        #
-        if ( m{^(\S+)}ms ) {
-            $entry->_setAttribute( name => $1 );
-        }
+		$entry->_addVLDBSite($site);
+
+	    }
+
+	}
+
+	#
+	# Last possibility (that we know of) -- volume might be
+	# locked.
+	#
+	if ( /LOCKED/ ) {
+	    $entry->_setAttribute( locked => 1 );
+	    next;
+	}
+
+	#
+	# Actually, this is the last possibility...  The volume name
+	# leading the VLDB entry stanza.
+	#
+	if ( /^(\S+)/ ) {
+	    $entry->_setAttribute( name => $1 );
+	}
 
     }
 
     $result->_addVLDBEntry($entry);
 
-    $self->_restore_stderr;
+    $errors++ unless $self->_reap_cmds();
 
-    if ( $self->_errors =~ m{VLDB: no such entry}ms ) {
-        $self->_reap_commands( allowstatus => [ 1, 255 ] );
-        return;
-    } else {
-        $self->_reap_commands;
-        return $result;
-    }
+    $errors++ unless $self->_restore_stderr();
+
+    return if $errors;
+    return $result;
 
 }
 
 sub listaddrs {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
     my @result = ();
 
-    $self->operation( q{listaddrs} );
+    $self->{operation} = "listaddrs";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
 
     if ( $args{printuuid} ) {
 
-        while ( defined($_ = $self->_handle->getline) ) {
+	while ( defined($_ = $self->{handle}->getline()) ) {
 
-            chomp;
+	    chomp;
 
-            if ( m{^UUID:\s+(\S+)}ms ) {
+	    if ( /^UUID:\s+(\S+)/ ) {
 
-                my $fileserver = AFS::Object::FileServer->new( uuid => $1 );
+		my $fileserver = AFS::Object::FileServer->new( uuid => $1 );
 
-                my @addresses = ();
-                my $hostname  = q{};
+		my @addresses = ();
+		my $hostname = "";
 
-                while ( defined($_ = $self->_handle->getline) ) {
-                    s{^\s*}{}gms;
-                    s{\s*$}{}gms;
-                    last if m{^\s*$}ms;
-                    chomp;
-                    if ( m{^\d+\.\d+\.\d+\.\d+$}ms ) {
-                        push @addresses, $_;
-                    } else {
-                        $hostname = $_;
-                    }
-                }
+		while ( defined($_ = $self->{handle}->getline()) ) {
+		    s/^\s*//g;
+		    s/\s*$//g;
+		    last if /^\s*$/;
+		    chomp;
+		    if ( /^(\[)?(\d+\.\d+\.\d+\.\d+)(\])?(:\d+)?$/ ) {
+			push(@addresses,$2);
+		    } else {
+			$hostname = $_;
+            $hostname =~ s/:\d+//;
+		    }
+		}
 
-                $fileserver->_setAttribute( addresses => \@addresses ) if @addresses;
-                $fileserver->_setAttribute( hostname => $hostname )    if $hostname;
+		$fileserver->_setAttribute( addresses => \@addresses ) if @addresses;
+		$fileserver->_setAttribute( hostname => $hostname ) if $hostname;
 
-                push @result, $fileserver;
+		push(@result,$fileserver);
 
-            }
+	    }
 
-        }
+	}
 
     } elsif ( $args{uuid} ) {
 
-        my @addresses = ();
-        my $hostname  = q{};
+	my @addresses = ();
+	my $hostname = "";
 
-        while ( defined($_ = $self->_handle->getline) ) {
-            chomp;
-            s{^\s*}{}gms;
-            s{\s*$}{}gms;
-            if ( m{^\d+\.\d+\.\d+\.\d+$}ms ) {
-                push @addresses, $_;
-            } else {
-                $hostname = $_;
-            }
-        }
+	while ( defined($_ = $self->{handle}->getline()) ) {
+	    chomp;
+	    s/^\s*//g;
+	    s/\s*$//g;
+        if ( /^(\[)?(\d+\.\d+\.\d+\.\d+)(\])?(:\d+)?$/ ) {
+		push(@addresses,$2);
+	    } else {
+		$hostname = $_;
+	    }
+	}
 
-        if ( $hostname || @addresses ) {
-            my $fileserver = AFS::Object::FileServer->new;
-            $fileserver->_setAttribute( addresses => \@addresses ) if @addresses;
-            $fileserver->_setAttribute( hostname => $hostname )    if $hostname;
-            push @result, $fileserver;
-        }
+	if ( $hostname || @addresses ) {
+	    my $fileserver = AFS::Object::FileServer->new();
+	    $fileserver->_setAttribute( addresses => \@addresses ) if @addresses;
+	    $fileserver->_setAttribute( hostname => $hostname ) if $hostname;
+	    push(@result,$fileserver);
+	}
 
     } else {
 
-        while ( defined($_ = $self->_handle->getline) ) {
-            chomp;
-            s{^\s*}{}gms;
-            s{\s*$}{}gms;
-            if ( m{^\d+\.\d+\.\d+\.\d+$}ms ) {
-                push @result, AFS::Object::FileServer->new( addresses => [$_] );
-            } else {
-                push @result, AFS::Object::FileServer->new( hostname => $_ );
+	while ( defined($_ = $self->{handle}->getline()) ) {
+	    if ( /^UUID:\s+(\S+)/ ) {
+
+            my $fileserver = AFS::Object::FileServer->new( uuid => $1 );
+
+            my @addresses = ();
+            my $hostname = "";
+
+            while ( defined($_ = $self->{handle}->getline()) ) {
+                s/^\s*//g;
+                s/\s*$//g;
+                last if /^\s*$/;
+                chomp;
+                if ( /^(\[)?(\d+\.\d+\.\d+\.\d+)(\])?(:\d+)?$/ ) {
+                push(@addresses,$2);
+                } else {
+                $hostname = $_;
+                $hostname =~ s/:\d+//;
+                }
             }
-        }       
+
+            $fileserver->_setAttribute( addresses => \@addresses ) if @addresses;
+            $fileserver->_setAttribute( hostname => $hostname ) if $hostname;
+
+            push(@result,$fileserver);
+
+	    } else {
+
+            chomp;
+            s/^\s*//g;
+            s/\s*$//g;
+		    if ( /^(\[)?(\d+\.\d+\.\d+\.\d+)(\])?(:\d+)?$/ ) {
+            push(@result,AFS::Object::FileServer->new( addresses => [$2] ));
+            } else {
+            push(@result,AFS::Object::FileServer->new( hostname => $_ ));
+            }
+        }
+	}
 
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return @result;
 
 }
@@ -543,35 +707,40 @@ sub listaddrs {
 sub listpart {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::FileServer->new;
+    my $result = AFS::Object::FileServer->new();
 
-    $self->operation( q{listpart} );
+    $self->{operation} = "listpart";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    return unless $self->_save_stderr();
 
-        chomp;
+    my $errors = 0;
 
-        next if not m{/vice}ms;
+    $errors++ unless $self->_exec_cmds();
 
-        s{^\s+}{}gms;
-        s{\s+$}{}gms;
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        foreach my $partname ( split ) {
-            my $partition = AFS::Object::Partition->new( partition => $partname );
-            $result->_addPartition($partition);
-        }
+	chomp;
+
+	next unless m:/vice:;
+
+	s/^\s+//g;
+	s/\s+$//g;
+
+	foreach my $partname ( split ) {
+	    my $partition = AFS::Object::Partition->new( partition => $partname );
+	    $result->_addPartition($partition);
+	}
 
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
 
+    return if $errors;
     return $result;
 
 }
@@ -579,113 +748,122 @@ sub listpart {
 sub listvldb {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    $self->operation( q{listvldb} );
+    $self->{operation} = "listvldb";
 
     my $locked = 0;
 
-    my $result = AFS::Object::VLDB->new;
+    my $result = AFS::Object::VLDB->new();
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    return unless $self->_save_stderr();
 
-        chomp;
+    my $errors = 0;
 
+    $errors++ unless $self->_exec_cmds();
 
-        # If it starts with a blank line, then its not a volume name.
-        next if m{^\s*$}ms;
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        # Skip the introductory lines of the form:
-        # "VLDB entries for all servers"
-        # "VLDB entries for server ny91af01"
-        # "VLDB entries for server ny91af01 partition /vicepa"
-        next if m{^VLDB entries for }ms;
+	chomp;
 
-        s{\s+$}{}gms;              # Might be trailing whitespace...
+	next if /^\s*$/;	# If it starts with a blank line, then
+				# its not a volume name.
+	#
+	# Skip the introductory lines of the form:
+	# "VLDB entries for all servers"
+	# "VLDB entries for server ny91af01"
+	# "VLDB entries for server ny91af01 partition /vicepa"
+	#
+	next if /^(VLDB entries|Location information) for /;
 
-        #
-        # We either get the total number of volumes, or we assume the
-        # line is a volume name.
-        #
-        if ( m{Total entries:\s+(\d+)}ms ) {
-            $result->_setAttribute( total => $1 );
-            next;
-        }
+	s/\s+$//g;		# Might be trailing whitespace...
 
-        my $name = $_;
+	#
+	# We either get the total number of volumes, or we assume the
+	# line is a volume name.
+	#
+	if ( /Total entries:\s+(\d+)/ ) {
+	    $result->_setAttribute( total => $1 );
+	    next;
+	}
 
-        my $entry = AFS::Object::VLDBEntry->new( name => $name );
+	my $name = $_;
 
-        while ( defined($_ = $self->_handle->getline) ) {
+	my $entry = AFS::Object::VLDBEntry->new( name => $name );
 
-            chomp;
+	while ( defined($_ = $self->{handle}->getline()) ) {
 
-            last if m{^\s*$}ms;    # Volume info ends with a blank line
+	    chomp;
 
-            if ( m{RWrite:\s+(\d+)}ms ) { $entry->_setAttribute( rwrite => $1 ); }
-            if ( m{ROnly:\s+(\d+)}ms )  { $entry->_setAttribute( ronly  => $1 ); }
-            if ( m{Backup:\s+(\d+)}ms ) { $entry->_setAttribute( backup => $1 ); }
-            if ( m{RClone:\s+(\d+)}ms ) { $entry->_setAttribute( rclone => $1 ); }
+	    last if /^\s*$/;	# Volume info ends with a blank line
 
-            if ( m{^\s+number of sites ->\s+(\d+)}ms ) {
+	    #
+	    # Code to parse this output lives in examine.pl.  This
+	    # will need to be made generic and used here to parse and
+	    # return the full vldb entry.
+	    #
 
-                my $sites = $1;
+	    if ( /RWrite:\s+(\d+)/ ) { $entry->_setAttribute( rwrite 	=> $1 ); }
+	    if ( /ROnly:\s+(\d+)/ )  { $entry->_setAttribute( ronly 	=> $1 ); }
+	    if ( /Backup:\s+(\d+)/ ) { $entry->_setAttribute( backup	=> $1 ); }
+	    if ( /RClone:\s+(\d+)/ ) { $entry->_setAttribute( rclone	=> $1 ); }
 
-                $entry->_setAttribute( sites => $sites );
+	    if ( /^\s+number of sites ->\s+(\d+)/ ) {
 
-                while ( defined($_ = $self->_handle->getline) ) {
+		my $sites = $1;
+        $entry->_setAttribute( sites => $sites );
 
-                    chomp;
+		while ( defined($_ = $self->{handle}->getline()) ) {
 
-                    next if not m{^\s+server\s+(\S+)\s+partition\s+(/vicep\w+)\s+([A-Z]{2})\s+Site\s*(--\s+)?(.*)?}ms;
+		    chomp;
 
-                    $sites--;
+		    next unless m%^\s+server\s+([^:]+)(:(\d+))?\s+partition\s+(/vicep\w+)\s+([A-Z]{2})\s+Site\s*(--\s+)?(.*)?%;
 
-                    my $site = AFS::Object::VLDBSite->new(
-                        server    => $1,
-                        partition => $2,
-                        type      => $3,
-                        status    => $5,
-                    );
+		    $sites--;
 
-                    $entry->_addVLDBSite( $site );
+            my $port = ( defined $3 ) ? $3 : 7005;
+		    my $site = AFS::Object::VLDBSite->new
+		      (
+		       server		=> $1,
+               port         => $port,
+		       partition	=> $4,
+		       type		=> $5,
+		       status		=> $7,
+		      );
 
-                    last if $sites == 0;
+		    $entry->_addVLDBSite( $site );
 
-                }
+		    last if $sites == 0;
 
-            }
+		}
 
-            #
-            # Last possibility (that we know of) -- volume might be
-            # locked.
-            #
-            if ( m{LOCKED}ms ) {
-                $entry->_setAttribute( locked => 1 );
-                $locked++;
-            }
+	    }
 
-        }
+	    #
+	    # Last possibility (that we know of) -- volume might be
+	    # locked.
+	    #
+	    if ( /LOCKED/ ) {
+		$entry->_setAttribute( locked => 1 );
+		$locked++;
+	    }
 
-        $result->_addVLDBEntry( $entry );
+	}
+
+	$result->_addVLDBEntry( $entry );
 
     }
 
     $result->_setAttribute( locked => $locked );
 
-    $self->_restore_stderr;
+    $errors++ unless $self->_reap_cmds();
 
-    if ( $self->_errors =~ m{VLDB: no such entry}ms ) {
-        $self->_reap_commands( allowstatus => 1 );
-        return;
-    } else {
-        $self->_reap_commands;
-        return $result;
-    }
+    $errors++ unless $self->_restore_stderr();
+
+    return if $errors;
+    return $result;
 
 }
 
@@ -693,178 +871,207 @@ sub listvldb {
 sub listvol {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    if ( exists $args{format} ) {
-        croak qq{Unsupported 'vos listvol' argument: -format\n};
-    }
+    my $result = AFS::Object::VolServer->new();
 
-    my $result = AFS::Object::VolServer->new;
+    $self->{operation} = "listvol";
 
-    $self->operation( q{listvol} );
-
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
-
-    if ( delete $args{extended} ) {
-        carp qq{vos listvol: -extended is not supported by this version of the API};
-    }
-
-    while ( defined($_ = $self->_handle->getline) ) {
-
-        chomp;
-
-        next if m{^\s*$}ms;        # Blank lines are not interesting
-
-        next if not m{^Total number of volumes on server \S+ partition (\/vice[\w]+): (\d+)}ms;
-
-        my $partition = AFS::Object::Partition->new(
-            partition => $1,
-            total     => $2,
-        );
-
-        while ( defined($_ = $self->_handle->getline) ) {
-
-            chomp;
-
-            last if m{^\s*$}ms and $args{fast};
-            next if m{^\s*$};
-
-            s{\s+$}{}ms;
-
-            if ( m{^Total volumes onLine (\d+) ; Total volumes offLine (\d+) ; Total busy (\d+)}ms ) {
-                $partition->_setAttribute(
-                    online  => $1,
-                    offline => $2,
-                    busy    => $3,
-                );
-                last;           # Done with this partition
-            }
-
-            if ( m{Volume (\d+) is busy}ms ) {
-                my $volume = AFS::Object::VolumeHeader->new(
-                    id       => $1,
-                    status   => q{busy},
-                    attached => 1,
-                );
-                $partition->_addVolumeHeader($volume);
-                next;
-            } elsif ( m{Could not attach volume (\d+)}ms ) {
-                my $volume = AFS::Object::VolumeHeader->new(
-                    id       => $1,
-                    status   => q{offline},
-                    attached => 0,
-                );
-                $partition->_addVolumeHeader($volume);
-                next;
-            }
-
-            #
-            # We have to handle multiple formats here.  For now, just
-            # parse the "fast" and normal output.  Extended is not yet
-            # supported.
-            #
-
-            my (@array) = split;
-            my ($name,$id,$type,$size,$status) = ();
-
-            my $volume = AFS::Object::VolumeHeader->new;
-
-            if ( @array == 6 ) {
-                ($name,$id,$type,$size,$status) = @array[0..3,5];
-                $status = q{offline} if $status eq q{Off-line};
-                $status = q{online}  if $status eq q{On-line};
-                $volume->_setAttribute(
-                    id       => $id,
-                    name     => $name,
-                    type     => $type,
-                    size     => $size,
-                    status   => $status,
-                    attached => 1,
-                );
-            } elsif ( @array == 1 ) {
-                $volume->_setAttribute(
-                    id       => $_,
-                    status   => q{online},
-                    attached => 1,
-                );
-            } else {
-                croak( qq{Unable to parse header summary line:\n} . $_ );
-            }
-
-            #
-            # If the output is long, then we have some more
-            # interesting information to parse.  See vos/examine.pl
-            # for notes.  This code was stolen from there...
-            #
-
-            if ( $args{long} or $args{extended} ) {
-
-                while ( defined($_ = $self->_handle->getline) ) {
-
-                    given ( $_ ) {
-
-                        when ( m{^\s*$}ms ) {
-                            last;
-                        }
-
-                        when ( m{^\s+RWrite\s+(\d+)\s+ROnly\s+(\d+)\s+Backup\s+(\d+)}ms ) {
-                            $volume->_setAttribute(
-                                rwrite => $1,
-                                ronly  => $2,
-                                backup => $3,
-                            );
-                            if ( m{RClone\s+(\d+)}ms ) {
-                                $volume->_setAttribute( rclone => $1 );
-                            }
-                        }
-
-                        when ( m{^\s+MaxQuota\s+(\d+)}ms ) {
-                            $volume->_setAttribute( maxquota => $1 );
-                        }
-
-                        when ( m{^\s+Creation\s+(.*)\s*$}ms ) {
-                            $volume->_setAttribute( creation => $1 );
-                        }
-
-                        when ( m{^\s+Copy\s+(.*)\s*$}ms ) {
-                            $volume->_setAttribute( copyTime    => $1 );
-                        }
-
-                        when ( m{^\s+Backup\s+(.*)\s*$}ms ) {
-                            $volume->_setAttribute( backupTime  => $1 );
-                        }
-
-                        when ( m{^\s+Last Access\s+(.*)\s*$}ms ) {
-                            $volume->_setAttribute( access      => $1 );
-                        }
-
-                        when ( m{^\s+Last Update\s+(.*)\s*$}ms ) {
-                            $volume->_setAttribute( update => $1 );
-                        }
-
-                        when ( m{^\s+(\d+) accesses}ms ) {
-                            $volume->_setAttribute( accesses => $1 );
-                        }
-
-                    }
-                    
-                }  # while(defined($_ = $self->_handle->getline)) {
-
-            }
-
-            $partition->_addVolumeHeader($volume);
-
+    foreach my $unsupported ( qw/extended format/ ) {
+        if ( delete $args{$unsupported} ) {
+        $self->_Croak("vos listvol: -$unsupported is not supported by this version of the API");
         }
+    }
 
-        $result->_addPartition($partition);
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	chomp;
+
+	next if /^\s*$/;	# Blank lines are not interesting
+
+	next unless /^Total number of volumes on server \S+(:\d+)? partition (\/vice[\w]+): (\d+)/;
+
+	my $partition = AFS::Object::Partition->new
+	  (
+	   partition			=> $2,
+	   total			=> $3,
+	  );
+
+	while ( defined($_ = $self->{handle}->getline()) ) {
+
+	    chomp;
+
+        # AuriStor output has no footer, so the header starts a new entry
+        if ( /^Total number of volumes on server \S+(:\d+)? partition (\/vice[\w]+): (\d+)/ ) {
+            if ( $partition->getAttribute(q{partition}) ) {
+                $result->_addPartition($partition);
+                $partition = AFS::Object::Partition->new
+                    (
+                     partition  => $2,
+                     total      => $3,
+                    );
+
+            }
+            next;
+        }
+        # there's no blank lines in AuriStor
+	    last if /^\s*$/ && $args{fast};
+
+	    next if /^\s*$/;
+
+	    s/\s+$//;
+
+	    if ( /^Total volumes onLine (\d+) ; Total volumes offLine (\d+) ; Total busy (\d+)/ ) {
+		$partition->_setAttribute
+		  (
+		   online		=> $1,
+		   offline		=> $2,
+		   busy			=> $3,
+		  );
+		last;		# Done with this partition
+	    }
+
+	    if ( /Volume (\d+) is busy/ ) {
+		my $volume = AFS::Object::VolumeHeader->new
+		  (
+		   id			=> $1,
+		   status		=> 'busy',
+		   attached		=> 1,
+		  );
+		$partition->_addVolumeHeader($volume);
+		next;
+	    } elsif ( /Could not attach volume (\d+)/ ) {
+		my $volume = AFS::Object::VolumeHeader->new
+		  (
+		   id			=> $1,
+		   status		=> 'offline',
+		   attached		=> 0,
+		  );
+		$partition->_addVolumeHeader($volume);
+		next;
+	    }
+
+	    #
+	    # We have to handle multiple formats here.  For
+	    # now, just parse the "fast" and normal output.
+	    # Extended is not yet supported.
+	    #
+
+	    my (@array) = split;
+	    my ($name,$id,$type,$size,$status) = ();
+
+	    my $volume = AFS::Object::VolumeHeader->new();
+
+	    if ( @array == 6 ) {
+		($name,$id,$type,$size,$status) = @array[0..3,5];
+		$status = 'offline' if $status eq 'Off-line';
+		$status = 'online' if $status eq 'On-line';
+		$volume->_setAttribute
+		  (
+		   id			=> $id,
+		   name			=> $name,
+		   type			=> $type,
+		   size			=> $size,
+		   status		=> $status,
+		   attached		=> 1,
+		  );
+	    } elsif ( @array == 1 ) {
+		$volume->_setAttribute
+		  (
+		   id			=> $_,
+		   status		=> 'online',
+		   attached		=> 1,
+		  );
+	    } else {
+		$self->_Carp("Unable to parse header summary line:\n" . $_);
+		$errors++;
+		next;
+	    }
+
+	    #
+	    # If the output is long, then we have some more
+	    # interesting information to parse.  See vos/examine.pl
+	    # for notes.  This code was stolen from there...
+	    #
+
+	    if ( $args{long} || $args{extended} ) {
+
+		while ( defined($_ = $self->{handle}->getline()) ) {
+
+		    last if /^\s*$/;
+
+		    if ( /^\s+RWrite\s+(\d+)\s+ROnly\s+(\d+)\s+Backup\s+(\d+)/ ) {
+			$volume->_setAttribute
+			  (
+			   rwrite		=> $1,
+			   ronly		=> $2,
+			   backup		=> $3,
+			  );
+			if ( /RClone\s+(\d+)/ ) {
+			    $volume->_setAttribute( rclone => $1 );
+			}
+			next;
+		    }
+
+		    if ( /^\s+MaxQuota\s+(\d+)/ ) {
+			$volume->_setAttribute( maxquota => $1 );
+			next;
+		    }
+
+		    if ( /^\s+Creation\s+(.*)\s*$/ ) {
+			$volume->_setAttribute( creation => $1 );
+			next;
+		    }
+
+		if ( /^\s+Copy\s+(.*)\s*$/ ) {
+		    $volume->_setAttribute( copyTime	=> $1 );
+		    next;
+		}
+
+		if ( /^\s+Backup\s+(.*)\s*$/ ) {
+		    $volume->_setAttribute( backupTime	=> $1 );
+		    next;
+		}
+
+		if ( /^\s+Last Access\s+(.*)\s*$/ ) {
+		    $volume->_setAttribute( access	=> $1 );
+		    next;
+		}
+
+		    if ( /^\s+Last Update\s+(.*)\s*$/ ) {
+			$volume->_setAttribute( update => $1 );
+			next;
+		    }
+
+		    if ( /^\s+(\d+) accesses/ ) {
+			$volume->_setAttribute( accesses => $1 );
+			next;
+		    }
+		}		# while(defined($_ = $self->{handle}->getline()))
+
+	    }
+
+	    $partition->_addVolumeHeader($volume);
+
+	}
+
+	$result->_addPartition($partition);
 
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
 
+    $errors++ unless $self->_restore_stderr();
+
+    return if $errors;
     return $result;
 
 }
@@ -872,176 +1079,137 @@ sub listvol {
 sub partinfo {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::FileServer->new;
+    my $result = AFS::Object::FileServer->new();
 
-    $self->operation( q{partinfo} );
+    $self->{operation} = "partinfo";
 
-    if ( $self->supportsArgument( q{partinfo}, q{summary} ) ) {
-        $args{summary} = 1;
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	next unless m|partition (/vice\w+): (-?\d+)\D+(\d+)$|;
+
+	my $partition = AFS::Object::Partition->new
+	  (
+	   partition 		=> $1,
+	   available		=> $2,
+	   total		=> $3,
+	  );
+
+	$result->_addPartition($partition);
+
     }
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    $errors++ unless $self->_reap_cmds();
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    $errors++ unless $self->_restore_stderr();
 
-        if ( m{partition (/vice\w+): (-?\d+)\D+(\d+)$}ms ) {
-            my $partition = AFS::Object::Partition->new(
-                partition => $1,
-                available => $2,
-                total     => $3,
-            );
-            $result->_addPartition($partition);
-        }
-
-        if ( m{Summary: (\d+) KB free out of (\d+) KB on (\d+) partitions}ms ) {
-            $result->_setAttribute(
-                available  => $1,
-                total      => $2,
-                partitions => $3,
-            );
-        }
-        
-    }
-
-    $self->_restore_stderr;
-    $self->_reap_commands;
-
+    return if $errors;
     return $result;
-
-}
-
-sub size {
-
-    my $self = shift;
-    my %args = @_;
-
-    $self->operation( q{size} );
-
-    my $result = AFS::Object->new;
-
-    # This is because without -dump, the command is meaningless
-    $args{dump} = 1;
-
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
-
-    while ( defined($_ = $self->_handle->getline) ) {
-
-        chomp;
-
-        given ( $_ ) {
-            when ( m{Volume: (.*)}ms ) {
-                $result->_setAttribute( volume => $1 );
-            }
-            when ( m{dump_size: (\d+)}ms ) {
-                $result->_setAttribute( dump_size => $1 );
-            }
-        }
-
-    }
-
-    $self->_restore_stderr;
-
-    if ( $self->_errors =~ m{VLDB: no such entry}ms ) {
-        $self->_reap_commands( allowstatus => [ 1, 255 ] );
-        return;
-    } else {
-        $self->_reap_commands;
-        return $result;
-    }
 
 }
 
 sub status {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    my $result = AFS::Object::VolServer->new;
+    my $result = AFS::Object::VolServer->new();
 
-    $self->operation( q{status} );
+    $self->{operation} = "status";
 
-    $self->_parse_arguments(%args);
-    $self->_save_stderr;
-    $self->_exec_commands;
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
 
     my $transaction = undef;
 
-    while ( defined($_ = $self->_handle->getline) ) {
+    while ( defined($_ = $self->{handle}->getline()) ) {
 
-        chomp;
+	chomp;
 
-        if ( m{No active transactions}ms ) {
-            $result->_setAttribute( transactions => 0 );
-            last;
-        }
+	if ( /No active transactions/ ) {
+	    $result->_setAttribute( transactions => 0 );
+	    last;
+	}
 
-        if ( m{Total transactions: (\d+)}ms ) {
-            $result->_setAttribute( transactions => $1 );
-            next;
-        }
+	if ( /Total transactions: (\d+)/ ) {
+	    $result->_setAttribute( transactions => $1 );
+	    next;
+	}
 
-        if ( m{^-+\s*$}ms ) {
-            if ( $transaction ) {
-                $result->_addTransaction($transaction);
-                $transaction = undef;
-            } else {
-                $transaction = AFS::Object::Transaction->new;
-            }
-        }
+	if ( /^-+\s*$/ ) {
 
-        next if not $transaction;
+	    if ( $transaction ) {
+		$result->_addTransaction($transaction);
+		$transaction = undef;
+	    } else {
+		$transaction = AFS::Object::Transaction->new();
+	    }
 
-        if ( m{transaction:\s+(\d+)}ms ) {
-            $transaction->_setAttribute( transaction => $1 );
-        }
+	}
 
-        if ( m{created:\s+(.*)$}ms ) {
-            $transaction->_setAttribute( created => $1 );
-        }
+	next unless $transaction;
 
-        if ( m{attachFlags:\s+(.*)$}ms ) {
-            $transaction->_setAttribute( attachFlags => $1 );
-        }
+	if ( /transaction:\s+(\d+)/ ) {
+	    $transaction->_setAttribute( transaction => $1 );
+	}
 
-        if ( m{volume:\s+(\d+)}ms ) {
-            $transaction->_setAttribute( volume => $1 );
-        }
+	if ( /created:\s+(.*)$/ ) {
+	    $transaction->_setAttribute( created => $1 );
+	}
 
-        if ( m{partition:\s+(\S+)}ms ) {
-            $transaction->_setAttribute( partition => $1 );
-        }
+	if ( /attachFlags:\s+(.*)$/ ) {
+	    $transaction->_setAttribute( attachFlags => $1 );
+	}
 
-        if ( m{procedure:\s+(\S+)}ms ) {
-            $transaction->_setAttribute( procedure => $1 );
-        }
+	if ( /volume:\s+(\d+)/ ) {
+	    $transaction->_setAttribute( volume => $1 );
+	}
 
-        if ( m{packetRead:\s+(\d+)}ms ) {
-            $transaction->_setAttribute( packetRead => $1 );
-        }
+	if ( /partition:\s+(\S+)/ ) {
+	    $transaction->_setAttribute( partition => $1 );
+	}
 
-        if ( m{lastReceiveTime:\s+(\d+)}ms ) {
-            $transaction->_setAttribute( lastReceiveTime => $1 );
-        }
+	if ( /procedure:\s+(\S+)/ ) {
+	    $transaction->_setAttribute( procedure => $1 );
+	}
 
-        if ( m{packetSend:\s+(\d+)}ms ) {
-            $transaction->_setAttribute( packetSend => $1 );
-        }
+	if ( /packetRead:\s+(\d+)/ ) {
+	    $transaction->_setAttribute( packetRead => $1 );
+	}
 
-        if ( m{lastSendTime:\s+(\d+)}ms ) {
-            $transaction->_setAttribute( lastSendTime => $1 );
-        }
+	if ( /lastReceiveTime:\s+(\d+)/ ) {
+	    $transaction->_setAttribute( lastReceiveTime => $1 );
+	}
+
+	if ( /packetSend:\s+(\d+)/ ) {
+	    $transaction->_setAttribute( packetSend => $1 );
+	}
+
+	if ( /lastSendTime:\s+(\d+)/ ) {
+	    $transaction->_setAttribute( lastSendTime => $1 );
+	}
 
     }
 
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    $errors++ unless $self->_reap_cmds();
 
+    $errors++ unless $self->_restore_stderr();
+
+    return if $errors;
     return $result;
 
 }
@@ -1049,88 +1217,97 @@ sub status {
 sub dump {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    $self->operation( q{dump} );
+    $self->{operation} = 'dump';
 
-    my $file = delete $args{file} || 
-        croak qq{Missing required argument: 'file'};
+    my $file = delete $args{file} || do {
+	$self->_Carp("Missing required argument: 'file'");
+	return;
+    };
 
-    my $gzip_default  = 6;
+    my $gzip_default = 6;
     my $bzip2_default = 6;
 
     my $nocompress = delete $args{nocompress} || undef;
-    my $gzip       = delete $args{gzip}       || undef;
-    my $bzip2      = delete $args{bzip2}      || undef;
-    my $filterout  = delete $args{filterout}  || undef;
+    my $gzip = delete $args{gzip} || undef;
+    my $bzip2 = delete $args{bzip2} || undef;
+    my $filterout = delete $args{filterout} || undef;
 
-    if ( $gzip and $bzip2 and $nocompress ) {
-        croak qq{Invalid argument combination: only one of 'gzip' or 'bzip2' or 'nocompress' may be specified};
+    if ( $gzip && $bzip2 && $nocompress ) {
+	$self->_Carp("Invalid argument combination: only one of 'gzip' or 'bzip2' or 'nocompress' may be specified");
+	return;
     }
 
-    if ( $file eq q{stdin} ) {
-        croak qq{Invalid argument 'stdin': you can't write output to stdin};
+    if ( $file eq 'stdin' ) {
+	$self->_Carp("Invalid argument 'stdin': you can't write output to stdin");
+	return;
     }
 
-    if ( $file ne q{stdout} ) {
+    if ( $file ne 'stdout' ) {
 
-        if ( $file =~ m{\.gz$}ms and not defined $gzip and not defined $nocompress ) {
-            $gzip  = $gzip_default;
-        } elsif ( $file =~ m{\.bz2$}ms and not defined $bzip2 and not defined $nocompress ) {
-            $bzip2 = $bzip2_default;
-        }
+	if ( $file =~ /\.gz$/ && not defined $gzip and not defined $nocompress ) {
+	    $gzip = $gzip_default;
+	} elsif ( $file =~ /\.bz2$/ && not defined $bzip2 and not defined $nocompress ) {
+	    $bzip2 = $bzip2_default;
+	}
 
-        if ( $gzip and not $file =~ m{\.gz$}ms ) {
-            $file .= q{.gz};
-        } elsif ( $bzip2 and not $file =~ m{\.bz2$}ms ) {
-            $file .= q{.bz2};
-        }
+	if ( $gzip && $file !~ /\.gz$/ ) {
+	    $file .= ".gz";
+	} elsif ( $bzip2 && $file !~ /\.bz2/ ) {
+	    $file .= ".bz2";
+	}
 
-        if ( not $gzip and not $bzip2 and not $filterout ) {
-            $args{file} = $file;
-        }
+	unless ( $gzip || $bzip2 || $filterout ) {
+	    $args{file} = $file;
+	}
 
     }
 
-    $self->_parse_arguments(%args);
-
-    my @commands = @{ $self->_commands };
+    return unless $self->_parse_arguments(%args);
 
     if ( $filterout ) {
 
-        if ( ref $filterout ne q{ARRAY} ) {
-            croak qq{Invalid argument 'filterout': must be an ARRAY reference};
-        }
+	unless ( ref $filterout eq 'ARRAY' ) {
+	    $self->_Carp("Invalid argument 'filterout': must be an ARRAY reference");
+	    return;
+	}
 
-        if ( ref $filterout->[0] eq q{ARRAY} ) {
-            foreach my $filter ( @$filterout ) {
-                if ( ref $filter ne q{ARRAY} ) {
-                    croak(
-                        qq{Invalid argument 'filterout': must be an ARRAY of ARRAY references, \n},
-                        qq{OR an ARRAY of strings.  See the documentation for details},
-                    );
-                }
-                push @commands, $filter;
-            }
-        } else {
-            push @commands, $filterout;
-        }
+	if ( ref($filterout->[0]) eq 'ARRAY' ) {
+	    foreach my $filter ( @$filterout ) {
+		unless ( ref $filter eq 'ARRAY' ) {
+		    $self->_Carp("Invalid argument 'filterout': must be an ARRAY of ARRAY references, \n" .
+				    "OR an ARRAY of strings.  See the documentation for details");
+		    return;
+		}
+		push( @{$self->{cmds}}, $filter );
+	    }
+	} else {
+	    push( @{$self->{cmds}}, $filterout );
+	}
 
     };
 
     if ( $gzip ) {
-        push @commands, [ q{gzip}, qq{-$gzip}, q{-c} ];
+	push( @{$self->{cmds}}, [ 'gzip', "-$gzip", '-c' ] );
     } elsif ( $bzip2 ) {
-        push @commands, [ q{bzip2}, qq{-$bzip2}, q{-c} ];
+	push( @{$self->{cmds}}, [ 'bzip2', "-$bzip2", '-c' ] );
     }
 
-    $self->_commands( \@commands );
+    return unless $self->_save_stderr();
 
-    $self->_save_stderr;
-    $self->_exec_commands( stdout => ( $args{file} ? q{/dev/null} : $file ) );
-    $self->_restore_stderr;
-    $self->_reap_commands;
+    my $errors = 0;
 
+    $errors++ unless $self->_exec_cmds
+      (
+       stdout 			=> ( $args{file} ? "/dev/null" : $file ),
+      );
+
+    $errors++ unless $self->_reap_cmds();
+
+    $errors++ unless $self->_restore_stderr();
+
+    return if $errors;
     return 1;
 
 }
@@ -1138,85 +1315,133 @@ sub dump {
 sub restore {
 
     my $self = shift;
-    my %args = @_;
+    my (%args) = @_;
 
-    $self->operation( q{restore} );
+    $self->{operation} = "restore";
 
-    my $file = delete $args{file} || 
-        croak qq{Missing required argument: 'file'};
+    my $file = delete $args{file} || do {
+	$self->_Carp("Missing required argument: 'file'");
+	return;
+    };
 
     my $nocompress = delete $args{nocompress} || undef;
-    my $gunzip     = delete $args{gunzip}     || undef;
-    my $bunzip2    = delete $args{bunzip2}    || undef;
-    my $filterin   = delete $args{filterin}   || undef;;
+    my $gunzip = delete $args{gunzip} || undef;
+    my $bunzip2 = delete $args{bunzip2} || undef;
+    my $filterin = delete $args{filterin} || undef;;
 
-    if ( $gunzip and $bunzip2 and $nocompress ) {
-        croak qq{Invalid argument combination: only one of 'gunzip' or 'bunzip2' or 'nocompress' may be specified};
+    if ( $gunzip && $bunzip2 && $nocompress ) {
+	$self->_Carp("Invalid argument combination: only one of 'gunzip' or 'bunzip2' or 'nocompress' may be specified");
+	return;
     }
 
-    if ( $file eq q{stdout} ) {
-        croak qq{Invalid argument 'stdout': you can't read input from stdout};
+    if ( $file eq 'stdout' ) {
+	$self->_Carp("Invalid argument 'stdout': you can't read input from stdout");
+	return;
     }
 
-    if ( $file ne q{stdin} ) {
+    if ( $file ne 'stdin' ) {
 
-        if ( $file =~ m{\.gz$} and not defined $gunzip and not defined $nocompress ) {
-            $gunzip = 1;
-        } elsif ( $file =~ m{\.bz2$}ms and not defined $bunzip2 and not defined $nocompress ) {
-            $bunzip2 = 1;
-        }
+	if ( $file =~ /\.gz$/ && not defined $gunzip and not defined $nocompress ) {
+	    $gunzip = 1;
+	} elsif ( $file =~ /\.bz2$/ && not defined $bunzip2 and not defined $nocompress ) {
+	    $bunzip2 = 1;
+	}
 
-        if ( not $gunzip and not $bunzip2 and not $filterin ) {
-            $args{file} = $file;
-        }
+	unless ( $gunzip || $bunzip2 || $filterin ) {
+	    $args{file} = $file;
+	}
 
     }
 
-    $self->_parse_arguments(%args);
-
-    my @commands = @{ $self->_commands };
+    return unless $self->_parse_arguments(%args);
 
     if ( $filterin ) {
 
-        if ( ref $filterin ne q{ARRAY} ) {
-            croak qq{Invalid argument 'filterin': must be an ARRAY reference};
-        }
+	unless ( ref $filterin eq 'ARRAY' ) {
+	    $self->_Carp("Invalid argument 'filterin': must be an ARRAY reference");
+	    return;
+	}
 
-        if ( ref $filterin->[0] eq q{ARRAY} ) {
-            foreach my $filter ( @{ $filterin } ) {
-                if ( ref $filter ne q{ARRAY} ) {
-                    croak(
-                        qq{Invalid argument 'filterin': must be an ARRAY of ARRAY references, \n},
-                        qq{OR an ARRAY of strings.  See the documentation for details},
-                    );
-                }
-                unshift @commands, $filter;
-            }
-        } else {
-            unshift @commands, $filterin;
-        }
+	if ( ref($filterin->[0]) eq 'ARRAY' ) {
+	    foreach my $filter ( @$filterin ) {
+		unless ( ref $filter eq 'ARRAY' ) {
+		    $self->_Carp("Invalid argument 'filterin': must be an ARRAY of ARRAY references, \n" .
+				"OR an ARRAY of strings.  See the documentation for details");
+		    return;
+		}
+		unshift( @{$self->{cmds}}, $filter );
+	    }
+	} else {
+	    unshift( @{$self->{cmds}}, $filterin );
+	}
 
     };
 
     if ( $gunzip ) {
-        unshift @commands, [ q{gunzip}, q{-c} ];
+	unshift( @{$self->{cmds}}, [ 'gunzip', '-c' ] );
     } elsif ( $bunzip2 ) {
-        unshift @commands, [ q{bunzip2}, q{-c} ];
+	unshift( @{$self->{cmds}}, [ 'bunzip2', '-c' ] );
     }
 
-    $self->_commands( \@commands );
+    my $errors = 0;
 
-    $self->_exec_commands(
-        stderr => q{stdout},
-        stdin  => $args{file} ? q{/dev/null} : $file,
-    );
+    $errors++ unless $self->_exec_cmds
+      (
+       stderr 			=> 'stdout',
+       stdin			=> ( $args{file} ? "/dev/null" : $file ),
+      );
 
-    $self->_parse_output;
-    $self->_reap_commands;
+    $errors++ unless $self->_parse_output();
+    $errors++ unless $self->_reap_cmds();
 
+    return if $errors;
     return 1;
 
 }
+
+sub size {
+
+    my $self = shift;
+    my (%args) = @_;
+
+    my $result = AFS::Object->new();
+
+    $self->{operation} = "size";
+
+    return unless $self->_parse_arguments(%args);
+
+    return unless $self->_save_stderr();
+
+    my $errors = 0;
+
+    $errors++ unless $self->_exec_cmds();
+
+    while ( defined($_ = $self->{handle}->getline()) ) {
+
+	chomp;
+
+    $result->_setAttribute( lc $1 => $2 ) if ( /(\S+):\s+(\S+)/ );
+
+    }
+
+    $errors++ unless $self->_reap_cmds();
+    $errors++ unless $self->_restore_stderr();
+
+    return if $errors;
+    return $result;
+
+}
+
+#
+# XXX -- Hack Alert!!!
+#
+# AuriStor has changed the sub-command name for certain VOS operations,
+# notably 'vldb' is replaced by 'loc'.
+# Note: only sub-commands with complex return codes need to be aliased,
+#   as _parse_arguments deals with aliasing commands
+
+*listfs = \&listaddrs;
+*listloc = \&listvldb;
 
 1;
 

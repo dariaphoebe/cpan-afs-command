@@ -1,33 +1,52 @@
+
 package AFS::Object::Path;
 
-use Moose;
+use strict;
 
-extends qw(AFS::Object);
-
-has q{_acl_normal}   => ( is => q{rw}, isa => q{AFS::Object::ACL} );
-has q{_acl_negative} => ( is => q{rw}, isa => q{AFS::Object::ACL} );
+our @ISA = qw(AFS::Object);
+our $VERSION = '1.99';
 
 sub getACL {
     my $self = shift;
     my $type = shift || 'normal';
-    return $self->_acl_normal   if $type eq q{normal};
-    return $self->_acl_negative if $type eq q{negative};
+    return unless ref $self->{_acl};
+    return $self->{_acl}->{"_$type"};
 }
 
 sub getACLNormal {
-    return shift->_acl_normal;
+    my $self = shift;
+    return $self->getACL();
 }
 
 sub getACLNegative {
-    return shift->_acl_negative;
+    my $self = shift;
+    return $self->getACL('negative');
 }
 
 sub _setACLNormal {
-    return shift->_acl_normal( shift );
+
+    my $self = shift;
+    my $acl = shift;
+
+    unless ( ref $acl && $acl->isa("AFS::Object::ACL") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::ACL object");
+    }
+
+    return $self->{_acl}->{_normal} = $acl;
+
 }
 
 sub _setACLNegative {
-    return shift->_acl_negative( shift );
+
+    my $self = shift;
+    my $acl = shift;
+
+    unless ( ref $acl && $acl->isa("AFS::Object::ACL") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::ACL object");
+    }
+
+    return $self->{_acl}->{_negative} = $acl;
+
 }
 
 1;

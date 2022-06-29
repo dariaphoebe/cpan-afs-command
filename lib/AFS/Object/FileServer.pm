@@ -1,29 +1,37 @@
+
 package AFS::Object::FileServer;
 
-use Moose;
-use Carp;
+use strict;
 
-extends qw(AFS::Object);
-
-has q{_partitions} => ( is => q{rw}, isa => q{HashRef}, default => sub { return {}; } );
+our @ISA = qw(AFS::Object);
+our $VERSION = '1.99';
 
 sub getPartitionNames {
-    return keys %{ shift->_partitions };
+    my $self = shift;
+    return unless ref $self->{_partitions};
+    return keys %{$self->{_partitions}};
 }
 
 sub getPartitions {
-    return values %{ shift->_partitions };
+    my $self = shift;
+    return unless ref $self->{_partitions};
+    return values %{$self->{_partitions}};
 }
 
 sub getPartition {
-    return shift->_partitions->{ shift(@_) };
+    my $self = shift;
+    my $partname = shift;
+    return unless ref $self->{_partitions};
+    return $self->{_partitions}->{$partname};
 }
 
 sub _addPartition {
     my $self = shift;
     my $partition = shift;
-    $partition->partition or croak q{Invalid partition object};
-    return $self->_partitions->{ $partition->partition } = $partition;
+    unless ( ref $partition && $partition->isa("AFS::Object::Partition") ) {
+	$self->_Croak("Invalid argument: must be an AFS::Object::Partition object");
+    }
+    return $self->{_partitions}->{$partition->partition()} = $partition;
 }
 
 1;
